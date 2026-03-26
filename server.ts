@@ -92,12 +92,13 @@ async function startServer() {
               
               if (folder === 'INBOX' && isOTP) {
                 otpsToMove.push(message.uid);
+                continue; // Skip adding to emails array, they will be fetched when syncing Updates
               }
 
               emails.push({
                 id: message.uid.toString(),
                 uid: message.uid,
-                folder: (folder === 'INBOX' && isOTP) ? 'Updates' : folder,
+                folder,
                 subject: parsed.subject || '(No Subject)',
                 from: parsed.from?.text || '',
                 to: Array.isArray(parsed.to) ? parsed.to.map(t => t.text).join(', ') : (parsed.to?.text || ''),
@@ -169,7 +170,7 @@ async function startServer() {
 
   // Save Draft
   app.post("/api/draft", upload.array('attachments'), async (req, res) => {
-    const { email, password, to, subject, text, html } = req.body;
+    const { email, password, to, subject, text, html, previousUid } = req.body;
     const files = req.files as Express.Multer.File[];
     
     if (!email || !password) return res.status(400).json({ error: "Missing credentials" });
@@ -196,13 +197,42 @@ async function startServer() {
       const rawMessage = await mail.compile().build();
       
       try { await client.mailboxCreate('Drafts'); } catch (e) {}
-      await client.append('Drafts', rawMessage, ['\\Draft', '\\Seen']);
+      
+      if (previousUid) {
+        const lock = await client.getMailboxLock('Drafts');
+        try {
+          await client.messageDelete(previousUid, { uid: true });
+        } catch (e) {
+          console.error("Failed to delete previous draft", e);
+        } finally {
+          lock.release();
+        }
+      }
+
+      const appendRes = await client.append('Drafts', rawMessage, ['\\Draft', '\\Seen']);
       await client.logout();
 
-      res.json({ success: true });
+      res.json({ success: true, uid: appendRes ? appendRes.uid : null });
     } catch (error: any) {
       console.error("Draft error:", error);
       res.status(500).json({ error: error.message || "Draft failed" });
+    }
+  });
+
+  // Create Folder
+  app.post("/api/create-folder", async (req, res) => {
+    const { email, password, folderName } = req.body;
+    if (!email || !password || !folderName) return res.status(400).json({ error: "Missing required fields" });
+
+    const client = getImapClient(email, password);
+    try {
+      await client.connect();
+      await client.mailboxCreate(folderName);
+      await client.logout();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Create folder error:", error);
+      res.status(500).json({ error: error.message || "Create folder failed" });
     }
   });
 
@@ -240,7 +270,7 @@ async function startServer() {
 
   // Send email
   app.post("/api/send", upload.array('attachments'), async (req, res) => {
-    const { email, password, to, subject, text, html } = req.body;
+    const { email, password, to, subject, text, html, draftUid } = req.body;
     const files = req.files as Express.Multer.File[];
     
     if (!email || !password || !to) return res.status(400).json({ error: "Missing required fields" });
@@ -272,9 +302,21 @@ async function startServer() {
         const rawMessage = await mail.compile().build();
         
         await client.append('Sent', rawMessage, ['\\Seen']);
+        
+        if (draftUid) {
+          const lock = await client.getMailboxLock('Drafts');
+          try {
+            await client.messageDelete(draftUid, { uid: true });
+          } catch (e) {
+            console.error("Failed to delete draft after sending", e);
+          } finally {
+            lock.release();
+          }
+        }
+        
         await client.logout();
       } catch (appendErr) {
-        console.error("Failed to append to Sent folder", appendErr);
+        console.error("Failed to append to Sent folder or delete draft", appendErr);
       }
 
       res.json({ success: true, messageId: info.messageId });

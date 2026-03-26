@@ -52,6 +52,7 @@ function Login({ onCancel }: { onCancel?: () => void }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const isDark = document.documentElement.classList.contains('dark') || localStorage.getItem('bmi_theme') === 'dark';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,11 +70,11 @@ function Login({ onCancel }: { onCancel?: () => void }) {
   };
 
   return (
-    <div className={cn("bg-gray-100 flex items-center justify-center p-4", onCancel ? "absolute inset-0 z-50 bg-black/50" : "min-h-screen")}>
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md relative">
+    <div className={cn("flex items-center justify-center p-4", onCancel ? "absolute inset-0 z-50 bg-black/50" : (isDark ? "min-h-screen bg-gray-900" : "min-h-screen bg-gray-100"))}>
+      <div className={cn("p-8 rounded-2xl shadow-xl w-full max-w-md relative", isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900')}>
         {onCancel && (
-          <button onClick={onCancel} className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full">
-            <X className="w-5 h-5 text-gray-500" />
+          <button onClick={onCancel} className={cn("absolute top-4 right-4 p-2 rounded-full", isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}>
+            <X className={cn("w-5 h-5", isDark ? 'text-gray-400' : 'text-gray-500')} />
           </button>
         )}
         <div className="flex justify-center mb-8">
@@ -82,7 +83,7 @@ function Login({ onCancel }: { onCancel?: () => void }) {
           </div>
         </div>
         <h1 className="text-2xl font-semibold text-center mb-2">Sign in</h1>
-        <p className="text-center text-gray-500 mb-8">to continue to BMI Mail</p>
+        <p className={cn("text-center mb-8", isDark ? 'text-gray-400' : 'text-gray-500')}>to continue to BMI Mail</p>
         
         {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
         
@@ -92,7 +93,7 @@ function Login({ onCancel }: { onCancel?: () => void }) {
               type="email"
               required
               placeholder="Email or phone"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className={cn("w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all", isDark ? 'bg-gray-900 border-gray-700 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -102,7 +103,7 @@ function Login({ onCancel }: { onCancel?: () => void }) {
               type="password"
               required
               placeholder="Enter your password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className={cn("w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all", isDark ? 'bg-gray-900 border-gray-700 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -129,6 +130,36 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [draftUid, setDraftUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeAccount) return;
+    if (!to && !subject && !body && attachments.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      const formData = new FormData();
+      formData.append('email', activeAccount.email);
+      formData.append('password', activeAccount.pass);
+      formData.append('to', to);
+      formData.append('subject', subject);
+      formData.append('text', body);
+      formData.append('html', body.replace(/\n/g, '<br/>'));
+      if (draftUid) formData.append('previousUid', draftUid);
+      attachments.forEach(file => formData.append('attachments', file));
+      
+      try {
+        const res = await fetch('/api/draft', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success && data.uid) {
+          setDraftUid(data.uid);
+        }
+      } catch (err) {
+        console.error("Auto-save draft failed", err);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [to, subject, body, attachments, activeAccount]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
@@ -151,6 +182,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       formData.append('subject', subject);
       formData.append('text', body);
       formData.append('html', body.replace(/\n/g, '<br/>'));
+      if (draftUid) formData.append('draftUid', draftUid);
       
       attachments.forEach(file => {
         formData.append('attachments', file);
@@ -161,6 +193,15 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
         body: formData
       });
       if (!res.ok) throw new Error('Failed to send');
+      
+      // Clear draftUid so handleCloseCompose doesn't save it again
+      setDraftUid(null);
+      // Also clear fields so handleCloseCompose doesn't trigger
+      setTo('');
+      setSubject('');
+      setBody('');
+      setAttachments([]);
+      
       onClose();
     } catch (err) {
       alert('Error sending email');
@@ -170,7 +211,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
   };
 
   const handleCloseCompose = async () => {
-    if ((to || subject || body || attachments.length > 0) && activeAccount) {
+    if (activeAccount && (to || subject || body || attachments.length > 0)) {
       const formData = new FormData();
       formData.append('email', activeAccount.email);
       formData.append('password', activeAccount.pass);
@@ -178,18 +219,17 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       formData.append('subject', subject);
       formData.append('text', body);
       formData.append('html', body.replace(/\n/g, '<br/>'));
+      if (draftUid) formData.append('previousUid', draftUid);
       attachments.forEach(file => formData.append('attachments', file));
       
-      fetch('/api/draft', {
-        method: 'POST',
-        body: formData
-      }).catch(console.error);
+      // Fire and forget
+      fetch('/api/draft', { method: 'POST', body: formData }).catch(console.error);
     }
     onClose();
   };
 
   return (
-    <div className="fixed bottom-0 right-24 w-[500px] bg-white rounded-t-xl shadow-2xl border border-gray-200 flex flex-col z-50">
+    <div className={cn("fixed bottom-0 right-24 w-[500px] rounded-t-xl shadow-2xl border flex flex-col z-50", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200')}>
       <div className="bg-gray-800 text-white px-4 py-3 rounded-t-xl flex justify-between items-center">
         <span className="font-medium text-sm">New Message</span>
         <button onClick={handleCloseCompose} className="hover:bg-gray-700 p-1 rounded"><X className="w-4 h-4" /></button>
@@ -199,26 +239,26 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
           type="text"
           placeholder="To"
           required
-          className="border-b border-gray-100 px-4 py-2 outline-none text-sm"
+          className={cn("border-b px-4 py-2 outline-none text-sm", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
           value={to}
           onChange={(e) => setTo(e.target.value)}
         />
         <input
           type="text"
           placeholder="Subject"
-          className="border-b border-gray-100 px-4 py-2 outline-none text-sm font-medium"
+          className={cn("border-b px-4 py-2 outline-none text-sm font-medium", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
         />
         <textarea
-          className="flex-1 p-4 outline-none resize-none text-sm min-h-[300px]"
+          className={cn("flex-1 p-4 outline-none resize-none text-sm min-h-[300px]", document.documentElement.classList.contains('dark') ? 'bg-gray-900 text-gray-100 placeholder-gray-500' : 'bg-white text-gray-900')}
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
         {attachments.length > 0 && (
-          <div className="px-4 py-2 flex flex-wrap gap-2 border-t border-gray-100">
+          <div className={cn("px-4 py-2 flex flex-wrap gap-2 border-t", document.documentElement.classList.contains('dark') ? 'border-gray-800' : 'border-gray-100')}>
             {attachments.map((att, i) => (
-              <div key={i} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded flex items-center gap-1">
+              <div key={i} className={cn("text-xs px-2 py-1 rounded flex items-center gap-1", document.documentElement.classList.contains('dark') ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700')}>
                 <File className="w-3 h-3" />
                 <span className="truncate max-w-[100px]">{att.name}</span>
                 <button type="button" onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="hover:text-red-500 ml-1">
@@ -228,7 +268,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
             ))}
           </div>
         )}
-        <div className="p-3 border-t border-gray-100 flex items-center justify-between">
+        <div className={cn("p-3 border-t flex items-center justify-between", document.documentElement.classList.contains('dark') ? 'border-gray-800' : 'border-gray-100')}>
           <button
             type="submit"
             disabled={sending || !to}
@@ -236,9 +276,9 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
           >
             {sending ? 'Sending...' : 'Send'}
           </button>
-          <label className="cursor-pointer p-2 hover:bg-gray-100 rounded-full">
+          <label className={cn("cursor-pointer p-2 rounded-full", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}>
             <input type="file" multiple className="hidden" onChange={handleFileChange} />
-            <File className="w-5 h-5 text-gray-600" />
+            <File className={cn("w-5 h-5", document.documentElement.classList.contains('dark') ? 'text-gray-400' : 'text-gray-600')} />
           </label>
         </div>
       </form>
@@ -258,6 +298,22 @@ function MainApp() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [logoutConfirmAccount, setLogoutConfirmAccount] = useState<string | null>(null);
+  
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+  });
+  const [customFolders, setCustomFolders] = useState<string[]>([]);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Listen to Firestore
   useEffect(() => {
@@ -267,7 +323,17 @@ function MainApp() {
       const data = snap.docs.map(doc => doc.data() as Email);
       setEmails(data);
     });
-    return () => unsub();
+
+    const fq = query(collection(db, `users/${user.uid}/folders`));
+    const unsubF = onSnapshot(fq, (snap) => {
+      const fetchedFolders = snap.docs.map(doc => doc.data().name as string);
+      setCustomFolders(fetchedFolders);
+    });
+
+    return () => {
+      unsub();
+      unsubF();
+    };
   }, [user]);
 
   // Sync emails from IMAP
@@ -364,10 +430,39 @@ function MainApp() {
   useEffect(() => {
     if (activeAccount && user) {
       syncEmails('INBOX');
+      syncEmails('Updates');
+      syncEmails('Drafts');
     }
   }, [activeAccount, user]);
 
   const unreadInboxCount = emails.filter(e => e.folder.toUpperCase() === 'INBOX' && !e.read && !e.localDeleted).length;
+
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim() || !activeAccount || !user) return;
+    
+    try {
+      await fetch('/api/create-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: activeAccount.email,
+          password: activeAccount.pass,
+          folderName: newFolderName.trim()
+        })
+      });
+      
+      await setDoc(doc(db, `users/${user.uid}/folders`, newFolderName.trim()), {
+        name: newFolderName.trim()
+      });
+      
+      setNewFolderName('');
+      setShowNewFolder(false);
+    } catch (err) {
+      console.error("Failed to create folder", err);
+      alert("Failed to create folder");
+    }
+  };
   const draftsCount = emails.filter(e => e.folder.toUpperCase() === 'DRAFTS' && !e.localDeleted).length;
   const updatesCount = emails.filter(e => e.folder.toUpperCase() === 'UPDATES' && !e.read && !e.localDeleted).length;
 
@@ -377,6 +472,11 @@ function MainApp() {
     { id: 'Sent', name: 'Sent', icon: Send },
     { id: 'Drafts', name: 'Drafts', icon: File, count: draftsCount },
     { id: 'Trash', name: 'Trash', icon: Trash2 },
+  ];
+
+  const allFolders = [
+    ...folders,
+    ...customFolders.map(f => ({ id: f, name: f, icon: Folder }))
   ];
 
   const filteredEmails = emails.filter(e => {
@@ -400,26 +500,26 @@ function MainApp() {
   const hasNext = currentIndex >= 0 && currentIndex < filteredEmails.length - 1;
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden">
+    <div className={cn("h-screen flex flex-col overflow-hidden transition-colors duration-200", theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900')}>
       {/* Header */}
-      <header className="h-16 border-b border-gray-200 flex items-center px-4 justify-between bg-white shrink-0">
+      <header className={cn("h-16 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white')}>
         <div className="flex items-center gap-4 w-64">
-          <button className="p-2 hover:bg-gray-100 rounded-full"><Menu className="w-5 h-5 text-gray-600" /></button>
+          <button className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}><Menu className="w-5 h-5" /></button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
               <Mail className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-medium text-gray-600 tracking-tight">BMI Mail</span>
+            <span className={cn("text-xl font-medium tracking-tight", theme === 'dark' ? 'text-gray-200' : 'text-gray-600')}>BMI Mail</span>
           </div>
         </div>
         
         <div className="flex-1 max-w-2xl px-8">
-          <div className="bg-gray-100 rounded-full flex items-center px-4 py-2 focus-within:bg-white focus-within:shadow-md focus-within:ring-1 focus-within:ring-gray-200 transition-all">
-            <Search className="w-5 h-5 text-gray-500 mr-3" />
+          <div className={cn("rounded-full flex items-center px-4 py-2 focus-within:shadow-md focus-within:ring-1 transition-all", theme === 'dark' ? 'bg-gray-800 focus-within:bg-gray-800 focus-within:ring-gray-700' : 'bg-gray-100 focus-within:bg-white focus-within:ring-gray-200')}>
+            <Search className={cn("w-5 h-5 mr-3", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')} />
             <input 
               type="text" 
               placeholder="Search mail" 
-              className="bg-transparent border-none outline-none w-full text-gray-700"
+              className={cn("bg-transparent border-none outline-none w-full", theme === 'dark' ? 'text-gray-100 placeholder-gray-400' : 'text-gray-700')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -435,10 +535,10 @@ function MainApp() {
           </button>
 
           {showProfileMenu && (
-            <div className="absolute top-10 right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <div className="text-xs text-gray-500 mb-1">Current account</div>
-                <div className="font-medium text-sm truncate">{activeAccount?.email}</div>
+            <div className={cn("absolute top-10 right-0 mt-2 w-72 rounded-xl shadow-xl border z-50 py-2", theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100')}>
+              <div className={cn("px-4 py-3 border-b", theme === 'dark' ? 'border-gray-800' : 'border-gray-100')}>
+                <div className={cn("text-xs mb-1", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Current account</div>
+                <div className={cn("font-medium text-sm truncate", theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}>{activeAccount?.email}</div>
               </div>
               
               <div className="max-h-64 overflow-y-auto py-2">
@@ -447,20 +547,21 @@ function MainApp() {
                     <button 
                       onClick={() => { switchAccount(acc.email); setShowProfileMenu(false); }}
                       className={cn(
-                        "flex-1 text-left flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 truncate",
-                        acc.email === activeAccount?.email ? "bg-blue-50/50" : ""
+                        "flex-1 text-left flex items-center gap-3 px-2 py-2 rounded-lg truncate",
+                        theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-50',
+                        acc.email === activeAccount?.email ? (theme === 'dark' ? "bg-blue-900/30" : "bg-blue-50/50") : ""
                       )}
                     >
-                      <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold shrink-0">
+                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0", theme === 'dark' ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-100 text-purple-700')}>
                         {acc.email[0].toUpperCase()}
                       </div>
-                      <span className={cn("text-sm truncate", acc.email === activeAccount?.email ? "font-bold text-blue-700" : "text-gray-700")}>
+                      <span className={cn("text-sm truncate", acc.email === activeAccount?.email ? (theme === 'dark' ? "font-bold text-blue-400" : "font-bold text-blue-700") : (theme === 'dark' ? "text-gray-300" : "text-gray-700"))}>
                         {acc.email}
                       </span>
                     </button>
                     <button 
                       onClick={() => { setLogoutConfirmAccount(acc.email); setShowProfileMenu(false); }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all ml-1"
+                      className={cn("p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all ml-1", theme === 'dark' ? 'text-gray-500 hover:text-red-400 hover:bg-red-900/30' : 'text-gray-400 hover:text-red-600 hover:bg-red-50')}
                       title="Log out"
                     >
                       <X className="w-4 h-4" />
@@ -469,7 +570,7 @@ function MainApp() {
                 ))}
               </div>
               
-              <div className="border-t border-gray-100 p-2 mt-1">
+              <div className={cn("border-t p-2 mt-1", theme === 'dark' ? 'border-gray-800' : 'border-gray-100')}>
                 <button 
                   onClick={() => {
                     if (accounts.length >= 10) {
@@ -480,7 +581,7 @@ function MainApp() {
                     setShowProfileMenu(false);
                   }}
                   disabled={accounts.length >= 10}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 disabled:opacity-50 transition-colors"
+                  className={cn("w-full text-left px-4 py-2 text-sm rounded-lg flex items-center gap-2 disabled:opacity-50 transition-colors", theme === 'dark' ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-50')}
                 >
                   <Plus className="w-4 h-4" />
                   Add another account
@@ -493,20 +594,20 @@ function MainApp() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 p-3 flex flex-col gap-1 border-r border-gray-100 bg-white">
+        <aside className={cn("w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white')}>
           <button 
             onClick={() => {
               setReplyData(null);
               setIsComposing(true);
             }}
-            className="bg-[#c2e7ff] hover:bg-[#b5dfff] text-[#001d35] flex items-center gap-4 px-4 py-4 rounded-2xl font-medium mb-4 w-fit transition-colors shadow-sm"
+            className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl font-medium mb-4 w-fit transition-colors shadow-sm", theme === 'dark' ? 'bg-blue-900 hover:bg-blue-800 text-blue-100' : 'bg-[#c2e7ff] hover:bg-[#b5dfff] text-[#001d35]')}
           >
             <Plus className="w-6 h-6" />
             Compose
           </button>
           
-          <div className="flex flex-col gap-1">
-            {folders.map(f => (
+          <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
+            {allFolders.map(f => (
               <button
                 key={f.id}
                 onClick={() => {
@@ -517,8 +618,8 @@ function MainApp() {
                 className={cn(
                   "flex items-center justify-between px-6 py-2 rounded-r-full font-medium text-sm transition-colors",
                   selectedFolder === f.id 
-                    ? "bg-[#d3e3fd] text-[#0b57d0]" 
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? (theme === 'dark' ? "bg-blue-900/50 text-blue-300" : "bg-[#d3e3fd] text-[#0b57d0]") 
+                    : (theme === 'dark' ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100")
                 )}
               >
                 <div className="flex items-center gap-4">
@@ -530,18 +631,50 @@ function MainApp() {
                 )}
               </button>
             ))}
+
+            {showNewFolder ? (
+              <form onSubmit={handleCreateFolder} className="px-6 py-2 mt-2">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Folder name"
+                  className={cn("w-full px-2 py-1 text-sm rounded border outline-none", theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300')}
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onBlur={() => setShowNewFolder(false)}
+                />
+              </form>
+            ) : (
+              <button
+                onClick={() => setShowNewFolder(true)}
+                className={cn("flex items-center gap-4 px-6 py-2 rounded-r-full font-medium text-sm transition-colors mt-2", theme === 'dark' ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100')}
+              >
+                <Plus className="w-4 h-4" />
+                Create Folder
+              </button>
+            )}
+          </div>
+
+          <div className="mt-auto pt-4 px-4">
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors", theme === 'dark' ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
+            >
+              <div className={cn("w-3 h-3 rounded-full", theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600')} />
+              {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+            </button>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col bg-white overflow-hidden">
-          <div className="h-12 border-b border-gray-100 flex items-center px-4 justify-between shrink-0">
+        <main className={cn("flex-1 flex flex-col overflow-hidden transition-colors duration-200", theme === 'dark' ? 'bg-gray-900' : 'bg-white')}>
+          <div className={cn("h-12 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800' : 'border-gray-100')}>
             <div className="flex items-center gap-2">
-              <button onClick={() => syncEmails(selectedFolder)} className="p-2 hover:bg-gray-100 rounded-full" disabled={syncing}>
-                <RefreshCw className={cn("w-4 h-4 text-gray-600", syncing && "animate-spin")} />
+              <button onClick={() => syncEmails(selectedFolder)} className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} disabled={syncing}>
+                <RefreshCw className={cn("w-4 h-4", theme === 'dark' ? 'text-gray-400' : 'text-gray-600', syncing && "animate-spin")} />
               </button>
             </div>
-            <div className="text-xs text-gray-500 font-medium">
+            <div className={cn("text-xs font-medium", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
               {filteredEmails.length} messages
             </div>
           </div>
@@ -551,11 +684,14 @@ function MainApp() {
               <div className="flex items-center justify-between mb-6">
                 <button 
                   onClick={() => setSelectedEmail(null)}
-                  className="p-2 hover:bg-gray-100 rounded-full inline-flex"
+                  className={cn("p-2 rounded-full inline-flex", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}
                 >
-                  <ChevronLeft className="w-5 h-5 text-gray-600" />
+                  <ChevronLeft className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
                 </button>
                 <div className="flex items-center gap-1">
+                  <span className={cn("text-xs mr-2", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
+                    {currentIndex + 1} of {filteredEmails.length}
+                  </span>
                   <button 
                     onClick={() => {
                       const prev = filteredEmails[currentIndex - 1];
@@ -563,9 +699,9 @@ function MainApp() {
                       if (!prev.read) handleMark(prev, 'read');
                     }}
                     disabled={!hasPrev}
-                    className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-30"
+                    className={cn("p-2 rounded-full disabled:opacity-30", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}
                   >
-                    <ChevronLeft className="w-5 h-5 text-gray-600" />
+                    <ChevronLeft className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
                   </button>
                   <button 
                     onClick={() => {
@@ -574,31 +710,31 @@ function MainApp() {
                       if (!next.read) handleMark(next, 'read');
                     }}
                     disabled={!hasNext}
-                    className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-30"
+                    className={cn("p-2 rounded-full disabled:opacity-30", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}
                   >
-                    <ChevronRight className="w-5 h-5 text-gray-600" />
+                    <ChevronRight className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
                   </button>
                 </div>
               </div>
-              <h2 className="text-2xl font-normal text-gray-900 mb-6">{selectedEmail.subject}</h2>
+              <h2 className={cn("text-2xl font-normal mb-6", theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}>{selectedEmail.subject}</h2>
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold text-lg">
+                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg", theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700')}>
                     {selectedEmail.from[0]?.toUpperCase() || '?'}
                   </div>
                   <div>
-                    <div className="font-medium text-sm text-gray-900">{selectedEmail.from}</div>
-                    <div className="text-xs text-gray-500">to {selectedEmail.to}</div>
+                    <div className={cn("font-medium text-sm", theme === 'dark' ? 'text-gray-200' : 'text-gray-900')}>{selectedEmail.from}</div>
+                    <div className={cn("text-xs", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>to {selectedEmail.to}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="text-xs text-gray-500">
+                  <div className={cn("text-xs", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>
                     {format(new Date(selectedEmail.date), 'MMM d, yyyy, h:mm a')}
                   </div>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleMark(selectedEmail, selectedEmail.starred ? 'unstar' : 'star')}
-                      className="p-2 hover:bg-gray-100 rounded-full"
+                      className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}
                       title={selectedEmail.starred ? "Unstar" : "Star"}
                     >
                       <Star className={cn("w-5 h-5", selectedEmail.starred ? "fill-yellow-400 text-yellow-400" : "text-gray-400")} />
@@ -611,21 +747,21 @@ function MainApp() {
                         });
                         setIsComposing(true);
                       }}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-full transition-colors"
+                      className={cn("text-sm font-medium px-4 py-2 rounded-full transition-colors", theme === 'dark' ? 'text-blue-400 hover:text-blue-300 bg-blue-900/50 hover:bg-blue-900' : 'text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100')}
                     >
                       Reply
                     </button>
                     <div className="relative group">
-                      <button className="p-2 hover:bg-gray-100 rounded-full" title="Move to folder">
-                        <Folder className="w-5 h-5 text-gray-600" />
+                      <button className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} title="Move to folder">
+                        <Folder className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
                       </button>
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 hidden group-hover:block z-50 py-1">
-                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Move to</div>
-                        {folders.filter(f => f.id !== selectedEmail.folder).map(f => (
+                      <div className={cn("absolute right-0 mt-2 w-48 rounded-xl shadow-xl border hidden group-hover:block z-50 py-1", theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
+                        <div className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wider", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Move to</div>
+                        {allFolders.filter(f => f.id !== selectedEmail.folder).map(f => (
                           <button 
                             key={f.id} 
                             onClick={() => handleMove(selectedEmail, f.id)} 
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className={cn("w-full text-left px-4 py-2 text-sm flex items-center gap-2", theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')}
                           >
                             <f.icon className="w-4 h-4 text-gray-400" />
                             {f.name}
@@ -637,18 +773,18 @@ function MainApp() {
                 </div>
               </div>
               <div 
-                className="prose max-w-none text-sm text-gray-800"
+                className={cn("prose max-w-none text-sm", theme === 'dark' ? 'text-gray-300' : 'text-gray-800')}
                 dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
               />
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
               {filteredEmails.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <div className={cn("flex flex-col items-center justify-center h-full", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
                   {syncing ? 'Loading...' : 'No messages in this folder.'}
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className={cn("divide-y", theme === 'dark' ? 'divide-gray-800' : 'divide-gray-100')}>
                   {filteredEmails.map(email => (
                     <div 
                       key={email.id}
@@ -657,46 +793,71 @@ function MainApp() {
                         if (!email.read) handleMark(email, 'read');
                       }}
                       className={cn(
-                        "flex items-center px-4 py-2 cursor-pointer hover:shadow-md transition-shadow group border-b border-gray-100 relative",
-                        !email.read ? "bg-white font-bold" : "bg-gray-50/50 text-gray-600"
+                        "flex items-center px-4 py-2 cursor-pointer transition-shadow group border-b relative",
+                        theme === 'dark' ? 'border-gray-800 hover:bg-gray-800' : 'border-gray-100 hover:shadow-md',
+                        !email.read 
+                          ? (theme === 'dark' ? "bg-gray-900 font-bold" : "bg-white font-bold") 
+                          : (theme === 'dark' ? "bg-gray-900/50 text-gray-400" : "bg-gray-50/50 text-gray-600")
                       )}
                     >
                       <div className="flex items-center gap-2 w-48 pr-4">
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleMark(email, email.starred ? 'unstar' : 'star'); }}
-                          className="p-1 hover:bg-gray-200 rounded-full"
+                          className={cn("p-1 rounded-full", theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200')}
                         >
                           <Star className={cn("w-4 h-4", email.starred ? "fill-yellow-400 text-yellow-400" : "text-gray-400")} />
                         </button>
-                        <div className="truncate text-sm">
+                        <div className={cn("truncate text-sm", theme === 'dark' ? 'text-gray-300' : 'text-gray-900')}>
                           {email.from.split('<')[0].trim() || email.from}
                         </div>
                       </div>
                       <div className="flex-1 truncate text-sm">
-                        <span className={cn("mr-2", !email.read ? "text-gray-900" : "text-gray-700")}>
+                        <span className={cn("mr-2", !email.read ? (theme === 'dark' ? "text-gray-100" : "text-gray-900") : (theme === 'dark' ? "text-gray-400" : "text-gray-700"))}>
                           {email.subject || '(No Subject)'}
                         </span>
-                        <span className="text-gray-500 font-normal">
+                        <span className={cn("font-normal", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>
                           - {email.snippet}
                         </span>
                       </div>
-                      <div className="w-24 text-right text-xs font-medium pl-4 group-hover:hidden">
+                      <div className={cn("w-24 text-right text-xs font-medium pl-4 group-hover:hidden", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
                         {format(new Date(email.date), 'MMM d')}
                       </div>
                       
                       {/* Hover Actions */}
-                      <div className="hidden group-hover:flex items-center gap-2 absolute right-4 bg-white/90 px-2 py-1 rounded shadow-sm">
+                      <div className={cn("hidden group-hover:flex items-center gap-2 absolute right-4 px-2 py-1 rounded shadow-sm", theme === 'dark' ? 'bg-gray-800/90' : 'bg-white/90')}>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleMark(email, email.read ? 'unread' : 'read'); }}
-                          className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600"
+                          className={cn("p-1.5 rounded-full", theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
                           title={email.read ? "Mark as unread" : "Mark as read"}
                         >
                           {email.read ? <Mail className="w-4 h-4" /> : <MailOpen className="w-4 h-4" />}
                         </button>
+                        <div className="relative group/folder">
+                          <button 
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn("p-1.5 rounded-full", theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
+                            title="Move to folder"
+                          >
+                            <Folder className="w-4 h-4" />
+                          </button>
+                          <div className={cn("absolute right-0 mt-1 w-48 rounded-xl shadow-xl border hidden group-hover/folder:block z-50 py-1", theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
+                            <div className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wider", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Move to</div>
+                            {allFolders.filter(f => f.id !== email.folder).map(f => (
+                              <button 
+                                key={f.id} 
+                                onClick={(e) => { e.stopPropagation(); handleMove(email, f.id); }} 
+                                className={cn("w-full text-left px-4 py-2 text-sm flex items-center gap-2", theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')}
+                              >
+                                <f.icon className="w-4 h-4 text-gray-400" />
+                                {f.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         {email.localDeleted ? (
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleMark(email, 'restore'); }}
-                            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600"
+                            className={cn("p-1.5 rounded-full", theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
                             title="Restore"
                           >
                             <RefreshCw className="w-4 h-4" />
@@ -704,7 +865,7 @@ function MainApp() {
                         ) : (
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleMark(email, 'delete'); }}
-                            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600"
+                            className={cn("p-1.5 rounded-full", theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -725,13 +886,13 @@ function MainApp() {
       
       {logoutConfirmAccount && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Confirm Logout</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to log out of <span className="font-medium text-gray-900">{logoutConfirmAccount}</span>?</p>
+          <div className={cn("p-6 rounded-2xl shadow-xl max-w-sm w-full", theme === 'dark' ? 'bg-gray-900 border border-gray-800' : 'bg-white')}>
+            <h3 className={cn("text-lg font-semibold mb-2", theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}>Confirm Logout</h3>
+            <p className={cn("mb-6", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')}>Are you sure you want to log out of <span className={cn("font-medium", theme === 'dark' ? 'text-gray-200' : 'text-gray-900')}>{logoutConfirmAccount}</span>?</p>
             <div className="flex justify-end gap-3">
               <button 
                 onClick={() => setLogoutConfirmAccount(null)} 
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                className={cn("px-4 py-2 rounded-lg font-medium transition-colors", theme === 'dark' ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100')}
               >
                 Cancel
               </button>
