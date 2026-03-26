@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidEmail(data) {
+      return data.keys().hasAll(['id', 'uid', 'folder', 'subject', 'from', 'to', 'date', 'body', 'read', 'userId']) &&
+             data.id is string &&
+             data.uid is number &&
+             data.folder is string &&
+             data.subject is string &&
+             data.from is string &&
+             data.to is string &&
+             data.date is string &&
+             data.body is string &&
+             data.read is bool &&
+             (!('starred' in data) || data.starred is bool) &&
+             (!('localDeleted' in data) || data.localDeleted is bool) &&
+             data.userId is string &&
+             data.userId == request.auth.uid;
+    }
+
+    match /users/{userId}/emails/{emailId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidEmail(request.resource.data);
+      allow update: if isOwner(userId) && isValidEmail(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(userId);
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "BMI Mail",
+  "description": "A full-featured web email client similar to Gmail, tailored for internal team usage.",
+  "requestFramePermissions": []
+}

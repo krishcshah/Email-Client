@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "Email": {
+      "title": "Email",
+      "description": "An email message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "number" },
+        "folder": { "type": "string" },
+        "subject": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "snippet": { "type": "string" },
+        "body": { "type": "string" },
+        "read": { "type": "boolean" },
+        "starred": { "type": "boolean" },
+        "localDeleted": { "type": "boolean" },
+        "flags": { "type": "array", "items": { "type": "string" } },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "uid", "folder", "subject", "from", "to", "date", "body", "read", "userId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/emails/{emailId}": {
+      "schema": { "$ref": "#/entities/Email" },
+      "description": "User's cached emails"
+    }
+  }
+}
