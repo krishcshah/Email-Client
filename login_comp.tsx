@@ -1,118 +1,10 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch, where } from 'firebase/firestore';
-import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from './lib/utils';
-
-// --- Types ---
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const currentUser = auth.currentUser;
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: currentUser?.uid,
-      email: currentUser?.email,
-      emailVerified: currentUser?.emailVerified,
-      isAnonymous: currentUser?.isAnonymous,
-      tenantId: currentUser?.tenantId,
-      providerInfo: currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-type Email = {
-  id: string;
-  uid: number;
-  folder: string;
-  subject: string;
-  from: string;
-  to: string;
-  date: string;
-  snippet: string;
-  body: string;
-  read: boolean;
-  starred?: boolean;
-  localDeleted?: boolean;
-  flags: string[];
-  userId: string;
-};
-
-// --- Context ---
-type Account = { email: string; pass: string };
-type AuthContextType = {
-  user: User | null;
-  activeAccount: Account | null;
-  accounts: Account[];
-  login: (email: string, pass: string) => Promise<void>;
-  switchAccount: (email: string) => Promise<void>;
-  logoutAccount: (email: string) => void;
-};
-
-interface ThemeContextType {
-  theme: 'light' | 'dark';
-  setTheme: (t: 'light' | 'dark') => void;
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  activeAccount: null,
-  accounts: [],
-  login: async () => {},
-  switchAccount: async () => {},
-  logoutAccount: () => {}
-});
-
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
-  setTheme: () => {}
-});
-
 function Login({ onCancel }: { onCancel?: () => void }) {
   const { login } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { theme, toggleTheme } = useContext(ThemeContext);
+  const { theme, setTheme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -131,109 +23,261 @@ function Login({ onCancel }: { onCancel?: () => void }) {
   };
 
   return (
-    <div className={cn("flex flex-col items-center justify-center p-4 transition-colors duration-300", 
-        onCancel ? "absolute inset-0 z-50 bg-black/50" : (isDark ? "min-h-screen bg-gray-950" : "min-h-screen bg-slate-50"))}>
-      
-      {/* Theme Toggle - Positioned top right if not in modal mode */}
-      {!onCancel && (
-      <div className="absolute top-6 right-6">
-        <button
-          onClick={toggleTheme}
-          className={cn(
-            "relative flex items-center w-16 h-8 rounded-full p-1 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2",
-            isDark ? "bg-gray-700 focus:ring-gray-600 focus:ring-offset-gray-950" : "bg-slate-300 focus:ring-slate-400 focus:ring-offset-white"
-          )}
-          aria-label="Toggle theme"
-        >
-          <div
-            className={cn(
-              "absolute left-1 w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center",
-              isDark ? "translate-x-8" : "translate-x-0"
-            )}
-          >
-            {isDark ? <Moon className="w-4 h-4 text-gray-800" /> : <Sun className="w-4 h-4 text-amber-500" />}
-          </div>
-        </button>
-      </div>
-      )}
-
-      <div className={cn("p-8 rounded-3xl shadow-2xl w-full max-w-md relative transition-all duration-300 border", 
-        isDark ? 'bg-gray-900 border-gray-800 text-white shadow-black/50' : 'bg-white border-slate-100 text-slate-900')}>
-        
+    <div className={cn("flex items-center justify-center p-4", onCancel ? "absolute inset-0 z-50 bg-black/50" : (isDark ? "min-h-screen bg-gray-900" : "min-h-screen bg-gray-100"))}>
+      <div className={cn("p-8 rounded-2xl shadow-xl w-full max-w-md relative", isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900')}>
         {onCancel && (
-          <button onClick={onCancel} className={cn("absolute top-5 right-5 p-2 rounded-full transition-colors", 
-            isDark ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900')}>
-            <X className="w-5 h-5" />
+          <button onClick={onCancel} className={cn("absolute top-4 right-4 p-2 rounded-full", isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}>
+            <X className={cn("w-5 h-5", isDark ? 'text-gray-400' : 'text-gray-500')} />
           </button>
         )}
-        
-        <div className="flex justify-center mb-6">
-          <div className={cn("w-20 h-20 rounded-2xl flex items-center justify-center shadow-inner", 
-            isDark ? "bg-blue-600/20 text-blue-400" : "bg-blue-50 text-blue-600")}>
-            <Mail className="w-10 h-10" />
+        <div className="flex justify-center mb-8">
+          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
+            <Mail className="w-8 h-8 text-white" />
           </div>
         </div>
+        <h1 className="text-2xl font-semibold text-center mb-2">Sign in</h1>
+        <p className={cn("text-center mb-8", isDark ? 'text-gray-400' : 'text-gray-500')}>to continue to BMI Mail</p>
         
-        <h1 className="text-3xl font-extrabold text-center mb-2 tracking-tight">Welcome Back</h1>
-        <p className={cn("text-center mb-8", isDark ? 'text-gray-400' : 'text-slate-500')}>Sign in to BMI Mail</p>
-
-        {error && (
-            <div className={cn("p-4 rounded-xl mb-6 text-sm flex items-center gap-3 border", 
-                isDark ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-red-50 border-red-200 text-red-600")}>
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-            </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div className="space-y-4">
-            <div>
-              <label className={cn("block text-sm font-medium mb-1.5", isDark ? "text-gray-300" : "text-slate-700")}>Email Input</label>
-              <input
-                type="text"
-                required
-                placeholder="Email or phone"
-                className={cn("w-full px-4 py-3 rounded-xl outline-none transition-all duration-200 border", 
-                    isDark ? 'bg-gray-950 border-gray-800 text-white placeholder-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            
-            <div>
-              <label className={cn("block text-sm font-medium mb-1.5", isDark ? "text-gray-300" : "text-slate-700")}>Security Key</label>
-              <input
-                type="password"
-                required
-                placeholder="Enter password"
-                className={cn("w-full px-4 py-3 rounded-xl outline-none transition-all duration-200 border", 
-                    isDark ? 'bg-gray-950 border-gray-800 text-white placeholder-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+        
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <input
+              type="email"
+              required
+              placeholder="Email or phone"
+              className={cn("w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all", isDark ? 'bg-gray-900 border-gray-700 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900')}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
-          
-          <button
-            type="submit"
-            disabled={loading}
-            className={cn("w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6", 
-                isDark ? "focus:ring-offset-gray-900" : "focus:ring-offset-white")}
-          >
-            {loading ? (
-                <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                Signing in...
-                </>
-            ) : "Sign In"}
-          </button>
+          <div>
+            <input
+              type="password"
+              required
+              placeholder="Enter your password"
+              className={cn("w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all", isDark ? 'bg-gray-900 border-gray-700 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900')}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div className="pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 flex justify-center"
+            >
+              {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : 'Next'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
 }
 
-function MainApp({ onLogout }: { onLogout: () => void }) {
+function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClose: () => void, initialTo?: string, initialSubject?: string }) {
+  const { user, activeAccount } = useContext(AuthContext);
+  const [to, setTo] = useState(initialTo);
+  const [cc, setCc] = useState('');
+  const [bcc, setBcc] = useState('');
+  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [subject, setSubject] = useState(initialSubject);
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [draftUid, setDraftUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeAccount) return;
+    if (!to && !cc && !bcc && !subject && !body && attachments.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      const formData = new FormData();
+      formData.append('email', activeAccount.email);
+      formData.append('password', activeAccount.pass);
+      formData.append('to', to);
+      if (cc) formData.append('cc', cc);
+      if (bcc) formData.append('bcc', bcc);
+      formData.append('subject', subject);
+      formData.append('text', body);
+      formData.append('html', body.replace(/\n/g, '<br/>'));
+      if (draftUid) formData.append('previousUid', draftUid);
+      attachments.forEach(file => formData.append('attachments', file));
+      
+      try {
+        const res = await fetch('/api/draft', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success && data.uid) {
+          setDraftUid(data.uid);
+        }
+      } catch (err) {
+        console.error("Auto-save draft failed", err);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [to, subject, body, attachments, activeAccount]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    const validFiles = files.filter(f => f.size <= 25 * 1024 * 1024);
+    if (validFiles.length < files.length) {
+      alert("Some files were too large. Maximum size is 25MB per file.");
+    }
+    setAttachments(prev => [...prev, ...validFiles]);
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeAccount) return;
+    setSending(true);
+    try {
+      const formData = new FormData();
+      formData.append('email', activeAccount.email);
+      formData.append('password', activeAccount.pass);
+      formData.append('to', to);
+      if (cc) formData.append('cc', cc);
+      if (bcc) formData.append('bcc', bcc);
+      formData.append('subject', subject);
+      formData.append('text', body);
+      formData.append('html', body.replace(/\n/g, '<br/>'));
+      if (draftUid) formData.append('draftUid', draftUid);
+      
+      attachments.forEach(file => {
+        formData.append('attachments', file);
+      });
+
+      const res = await fetch('/api/send', {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      
+      // Clear draftUid so handleCloseCompose doesn't save it again
+      setDraftUid(null);
+      // Also clear fields so handleCloseCompose doesn't trigger
+      setTo('');
+      setCc('');
+      setBcc('');
+      setSubject('');
+      setBody('');
+      setAttachments([]);
+      
+      onClose();
+    } catch (err) {
+      alert('Error sending email');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleCloseCompose = async () => {
+    if (activeAccount && (to || cc || bcc || subject || body || attachments.length > 0)) {
+      const formData = new FormData();
+      formData.append('email', activeAccount.email);
+      formData.append('password', activeAccount.pass);
+      formData.append('to', to);
+      if (cc) formData.append('cc', cc);
+      if (bcc) formData.append('bcc', bcc);
+      formData.append('subject', subject);
+      formData.append('text', body);
+      formData.append('html', body.replace(/\n/g, '<br/>'));
+      if (draftUid) formData.append('previousUid', draftUid);
+      attachments.forEach(file => formData.append('attachments', file));
+      
+      // Fire and forget
+      fetch('/api/draft', { method: 'POST', body: formData }).catch(console.error);
+    }
+    onClose();
+  };
+
+  return (
+    <div className={cn("fixed bottom-0 right-24 w-[500px] rounded-t-xl shadow-2xl border flex flex-col z-50", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200')}>
+      <div className="bg-gray-800 text-white px-4 py-3 rounded-t-xl flex justify-between items-center">
+        <span className="font-medium text-sm">New Message</span>
+        <button onClick={handleCloseCompose} className="hover:bg-gray-700 p-1 rounded"><X className="w-4 h-4" /></button>
+      </div>
+      <form onSubmit={handleSend} className="flex flex-col flex-1">
+        <div className={cn("border-b flex items-center pr-4", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100')}>
+          <input
+            type="text"
+            placeholder="To"
+            required
+            className={cn("flex-1 px-4 py-2 outline-none text-sm bg-transparent", document.documentElement.classList.contains('dark') ? 'text-gray-100 placeholder-gray-500' : 'text-gray-900')}
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
+          <button 
+            type="button" 
+            onClick={() => setShowCcBcc(!showCcBcc)}
+            className={cn("text-xs font-medium px-2 py-1 rounded transition-colors", document.documentElement.classList.contains('dark') ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-500 hover:bg-gray-100')}
+          >
+            Cc/Bcc
+          </button>
+        </div>
+        {showCcBcc && (
+          <>
+            <input
+              type="text"
+              placeholder="Cc"
+              className={cn("border-b px-4 py-2 outline-none text-sm", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
+              value={cc}
+              onChange={(e) => setCc(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Bcc"
+              className={cn("border-b px-4 py-2 outline-none text-sm", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
+              value={bcc}
+              onChange={(e) => setBcc(e.target.value)}
+            />
+          </>
+        )}
+        <input
+          type="text"
+          placeholder="Subject"
+          className={cn("border-b px-4 py-2 outline-none text-sm font-medium", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+        <textarea
+          className={cn("flex-1 p-4 outline-none resize-none text-sm min-h-[300px]", document.documentElement.classList.contains('dark') ? 'bg-gray-900 text-gray-100 placeholder-gray-500' : 'bg-white text-gray-900')}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        {attachments.length > 0 && (
+          <div className={cn("px-4 py-2 flex flex-wrap gap-2 border-t", document.documentElement.classList.contains('dark') ? 'border-gray-800' : 'border-gray-100')}>
+            {attachments.map((att, i) => (
+              <div key={i} className={cn("text-xs px-2 py-1 rounded flex items-center gap-1", document.documentElement.classList.contains('dark') ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700')}>
+                <File className="w-3 h-3" />
+                <span className="truncate max-w-[100px]">{att.name}</span>
+                <button type="button" onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="hover:text-red-500 ml-1">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={cn("p-3 border-t flex items-center justify-between", document.documentElement.classList.contains('dark') ? 'border-gray-800' : 'border-gray-100')}>
+          <button
+            type="submit"
+            disabled={sending || !to}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium text-sm transition-colors disabled:opacity-50"
+          >
+            {sending ? 'Sending...' : 'Send'}
+          </button>
+          <label className={cn("cursor-pointer p-2 rounded-full", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}>
+            <input type="file" multiple className="hidden" onChange={handleFileChange} />
+            <File className={cn("w-5 h-5", document.documentElement.classList.contains('dark') ? 'text-gray-400' : 'text-gray-600')} />
+          </label>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function MainApp() {
   const { user, activeAccount, accounts, switchAccount, logoutAccount } = useContext(AuthContext);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedFolder, setSelectedFolder] = useState('INBOX');
@@ -906,121 +950,6 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
     </div>
-  );
-}
-
-export default function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const [user, setUser] = useState<User | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>(() => {
-    try { return JSON.parse(localStorage.getItem('bmi_accounts') || '[]'); } catch { return []; }
-  });
-  const [activeAccount, setActiveAccount] = useState<Account | null>(() => {
-    try { return JSON.parse(localStorage.getItem('bmi_active_account') || 'null'); } catch { return null; }
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    localStorage.setItem('bmi_accounts', JSON.stringify(accounts));
-  }, [accounts]);
-
-  useEffect(() => {
-    localStorage.setItem('bmi_active_account', JSON.stringify(activeAccount));
-  }, [activeAccount]);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (activeAccount && (!user || user.email !== activeAccount.email)) {
-      signInWithEmailAndPassword(auth, activeAccount.email, activeAccount.pass).catch(console.error);
-    }
-  }, [activeAccount, user]);
-
-  const login = async (email: string, pass: string) => {
-    if (accounts.length >= 10) throw new Error("Maximum 10 accounts allowed");
-    const res = await fetch('/api/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: pass })
-    });
-    if (!res.ok) {
-      let errorMessage = 'Invalid credentials';
-      try {
-        const data = await res.json();
-        errorMessage = data.error || errorMessage;
-      } catch (e) {
-        const text = await res.text();
-        errorMessage = `Server Error (${res.status}): ${text || 'Empty response'}`;
-      }
-      throw new Error(errorMessage);
-    }
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        await createUserWithEmailAndPassword(auth, email, pass);
-      } else {
-        throw err;
-      }
-    }
-    const newAcc = { email, pass };
-    if (!accounts.find(a => a.email === email)) {
-      setAccounts(prev => [...prev, newAcc]);
-    }
-    setActiveAccount(newAcc);
-  };
-
-  const switchAccount = async (email: string) => {
-    const acc = accounts.find(a => a.email === email);
-    if (acc) {
-      await signInWithEmailAndPassword(auth, acc.email, acc.pass);
-      setActiveAccount(acc);
-    }
-  };
-
-  const logoutAccount = (email: string) => {
-    const newAccounts = accounts.filter(a => a.email !== email);
-    setAccounts(newAccounts);
-    if (activeAccount?.email === email) {
-      if (newAccounts.length > 0) {
-        switchAccount(newAccounts[0].email);
-      } else {
-        setActiveAccount(null);
-        auth.signOut();
-      }
-    }
-  };
-
-  if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
-
-  const isUserMatching = activeAccount && user && user.email === activeAccount.email;
-
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      <AuthContext.Provider value={{ user, activeAccount, accounts, login, switchAccount, logoutAccount }}>
-        {activeAccount ? (
-          isUserMatching ? <MainApp key={activeAccount.email} /> : <div className={cn("h-screen flex items-center justify-center", theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900')}>Switching account...</div>
-        ) : <Login />}
-      </AuthContext.Provider>
-    </ThemeContext.Provider>
   );
 }
 
