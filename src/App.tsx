@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch, where } from 'firebase/firestore';
 import { Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
@@ -373,7 +373,17 @@ function MainApp() {
     const q = query(collection(db, `users/${user.uid}/emails`), orderBy('date', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(doc => doc.data() as Email);
-      setEmails(data);
+      // Deduplicate by folder and uid to hide old numeric IDs if new ones exist
+      const uniqueEmails: Email[] = [];
+      const seen = new Set<string>();
+      for (const e of data) {
+        const key = `${e.folder}_${e.uid}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueEmails.push(e);
+        }
+      }
+      setEmails(uniqueEmails);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}/emails`);
     });
@@ -410,6 +420,20 @@ function MainApp() {
         const data = await res.json();
         // Save to Firestore using writeBatch
         const batch = writeBatch(db);
+
+        // Clean up old buggy numeric IDs
+        try {
+          const oldDocsQuery = query(collection(db, `users/${user.uid}/emails`), where('folder', '==', folder));
+          const oldDocsSnap = await getDocs(oldDocsQuery);
+          oldDocsSnap.forEach(docSnap => {
+            if (/^\d+$/.test(docSnap.id)) {
+              batch.delete(docSnap.ref);
+            }
+          });
+        } catch (e) {
+          console.error("Cleanup failed", e);
+        }
+
         for (const email of data.emails) {
           const emailData = { ...email, userId: user.uid };
           const emailRef = doc(db, `users/${user.uid}/emails`, email.id);
