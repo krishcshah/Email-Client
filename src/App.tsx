@@ -178,6 +178,9 @@ function Login({ onCancel }: { onCancel?: () => void }) {
 function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClose: () => void, initialTo?: string, initialSubject?: string }) {
   const { user, activeAccount } = useContext(AuthContext);
   const [to, setTo] = useState(initialTo);
+  const [cc, setCc] = useState('');
+  const [bcc, setBcc] = useState('');
+  const [showCcBcc, setShowCcBcc] = useState(false);
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -186,13 +189,15 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
 
   useEffect(() => {
     if (!activeAccount) return;
-    if (!to && !subject && !body && attachments.length === 0) return;
+    if (!to && !cc && !bcc && !subject && !body && attachments.length === 0) return;
 
     const timer = setTimeout(async () => {
       const formData = new FormData();
       formData.append('email', activeAccount.email);
       formData.append('password', activeAccount.pass);
       formData.append('to', to);
+      if (cc) formData.append('cc', cc);
+      if (bcc) formData.append('bcc', bcc);
       formData.append('subject', subject);
       formData.append('text', body);
       formData.append('html', body.replace(/\n/g, '<br/>'));
@@ -231,6 +236,8 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       formData.append('email', activeAccount.email);
       formData.append('password', activeAccount.pass);
       formData.append('to', to);
+      if (cc) formData.append('cc', cc);
+      if (bcc) formData.append('bcc', bcc);
       formData.append('subject', subject);
       formData.append('text', body);
       formData.append('html', body.replace(/\n/g, '<br/>'));
@@ -250,6 +257,8 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       setDraftUid(null);
       // Also clear fields so handleCloseCompose doesn't trigger
       setTo('');
+      setCc('');
+      setBcc('');
       setSubject('');
       setBody('');
       setAttachments([]);
@@ -263,11 +272,13 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
   };
 
   const handleCloseCompose = async () => {
-    if (activeAccount && (to || subject || body || attachments.length > 0)) {
+    if (activeAccount && (to || cc || bcc || subject || body || attachments.length > 0)) {
       const formData = new FormData();
       formData.append('email', activeAccount.email);
       formData.append('password', activeAccount.pass);
       formData.append('to', to);
+      if (cc) formData.append('cc', cc);
+      if (bcc) formData.append('bcc', bcc);
       formData.append('subject', subject);
       formData.append('text', body);
       formData.append('html', body.replace(/\n/g, '<br/>'));
@@ -287,14 +298,41 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
         <button onClick={handleCloseCompose} className="hover:bg-gray-700 p-1 rounded"><X className="w-4 h-4" /></button>
       </div>
       <form onSubmit={handleSend} className="flex flex-col flex-1">
-        <input
-          type="text"
-          placeholder="To"
-          required
-          className={cn("border-b px-4 py-2 outline-none text-sm", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-        />
+        <div className={cn("border-b flex items-center pr-4", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100')}>
+          <input
+            type="text"
+            placeholder="To"
+            required
+            className={cn("flex-1 px-4 py-2 outline-none text-sm bg-transparent", document.documentElement.classList.contains('dark') ? 'text-gray-100 placeholder-gray-500' : 'text-gray-900')}
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
+          <button 
+            type="button" 
+            onClick={() => setShowCcBcc(!showCcBcc)}
+            className={cn("text-xs font-medium px-2 py-1 rounded transition-colors", document.documentElement.classList.contains('dark') ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-500 hover:bg-gray-100')}
+          >
+            Cc/Bcc
+          </button>
+        </div>
+        {showCcBcc && (
+          <>
+            <input
+              type="text"
+              placeholder="Cc"
+              className={cn("border-b px-4 py-2 outline-none text-sm", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
+              value={cc}
+              onChange={(e) => setCc(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Bcc"
+              className={cn("border-b px-4 py-2 outline-none text-sm", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-100 text-gray-900')}
+              value={bcc}
+              onChange={(e) => setBcc(e.target.value)}
+            />
+          </>
+        )}
         <input
           type="text"
           placeholder="Subject"
@@ -350,14 +388,7 @@ function MainApp() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [logoutConfirmAccount, setLogoutConfirmAccount] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleClickOutside = () => setOpenMenuId(null);
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
+  
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
@@ -852,19 +883,15 @@ function MainApp() {
                       Reply
                     </button>
                     <div className="relative group">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === 'detail' ? null : 'detail'); }}
-                        className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} 
-                        title="Move to folder"
-                      >
+                      <button className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} title="Move to folder">
                         <Folder className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
                       </button>
-                      <div className={cn("absolute right-0 mt-2 w-48 rounded-xl shadow-xl border z-50 py-1", openMenuId === 'detail' ? 'block' : 'hidden', theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
+                      <div className={cn("absolute right-0 mt-2 w-48 rounded-xl shadow-xl border hidden group-hover:block z-50 py-1", theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
                         <div className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wider", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Move to</div>
                         {allFolders.filter(f => f.id !== selectedEmail.folder).map(f => (
                           <button 
                             key={f.id} 
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleMove(selectedEmail, f.id); }} 
+                            onClick={() => handleMove(selectedEmail, f.id)} 
                             className={cn("w-full text-left px-4 py-2 text-sm flex items-center gap-2", theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')}
                           >
                             <f.icon className="w-4 h-4 text-gray-400" />
@@ -938,18 +965,18 @@ function MainApp() {
                         </button>
                         <div className="relative group/folder">
                           <button 
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === email.id ? null : email.id); }}
+                            onClick={(e) => e.stopPropagation()}
                             className={cn("p-1.5 rounded-full", theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
                             title="Move to folder"
                           >
                             <Folder className="w-4 h-4" />
                           </button>
-                          <div className={cn("absolute right-0 mt-1 w-48 rounded-xl shadow-xl border z-50 py-1", openMenuId === email.id ? 'block' : 'hidden', theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
+                          <div className={cn("absolute right-0 mt-1 w-48 rounded-xl shadow-xl border hidden group-hover/folder:block z-50 py-1", theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
                             <div className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wider", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Move to</div>
                             {allFolders.filter(f => f.id !== email.folder).map(f => (
                               <button 
                                 key={f.id} 
-                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleMove(email, f.id); }} 
+                                onClick={(e) => { e.stopPropagation(); handleMove(email, f.id); }} 
                                 className={cn("w-full text-left px-4 py-2 text-sm flex items-center gap-2", theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')}
                               >
                                 <f.icon className="w-4 h-4 text-gray-400" />

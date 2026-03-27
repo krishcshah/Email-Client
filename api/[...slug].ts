@@ -177,7 +177,7 @@ app.post(["/api/move", "/move"], async (req, res) => {
 
 // Save Draft
 app.post(["/api/draft", "/draft"], upload.array('attachments'), async (req, res) => {
-  const { email, password, to, subject, text, html, previousUid } = req.body;
+  const { email, password, to, cc, bcc, subject, text, html, previousUid } = req.body;
   const files = req.files as Express.Multer.File[];
   
   if (!email || !password) return res.status(400).json({ error: "Missing credentials" });
@@ -192,6 +192,8 @@ app.post(["/api/draft", "/draft"], upload.array('attachments'), async (req, res)
       text: text || '',
       html: html || ''
     };
+    if (cc) mailOptions.cc = cc;
+    if (bcc) mailOptions.bcc = bcc;
 
     if (files && files.length > 0) {
       mailOptions.attachments = files.map(file => ({
@@ -277,7 +279,7 @@ app.post(["/api/mark", "/mark"], async (req, res) => {
 
 // Send email
 app.post(["/api/send", "/send"], upload.array('attachments'), async (req, res) => {
-  const { email, password, to, subject, text, html, draftUid } = req.body;
+  const { email, password, to, cc, bcc, subject, text, html, draftUid } = req.body;
   const files = req.files as Express.Multer.File[];
   
   if (!email || !password || !to) return res.status(400).json({ error: "Missing required fields" });
@@ -291,6 +293,8 @@ app.post(["/api/send", "/send"], upload.array('attachments'), async (req, res) =
       text,
       html
     };
+    if (cc) mailOptions.cc = cc;
+    if (bcc) mailOptions.bcc = bcc;
 
     if (files && files.length > 0) {
       mailOptions.attachments = files.map(file => ({
