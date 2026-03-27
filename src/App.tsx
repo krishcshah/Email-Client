@@ -350,7 +350,14 @@ function MainApp() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [logoutConfirmAccount, setLogoutConfirmAccount] = useState<string | null>(null);
-  
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
@@ -845,15 +852,19 @@ function MainApp() {
                       Reply
                     </button>
                     <div className="relative group">
-                      <button className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} title="Move to folder">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === 'detail' ? null : 'detail'); }}
+                        className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} 
+                        title="Move to folder"
+                      >
                         <Folder className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
                       </button>
-                      <div className={cn("absolute right-0 mt-2 w-48 rounded-xl shadow-xl border hidden group-hover:block z-50 py-1", theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
+                      <div className={cn("absolute right-0 mt-2 w-48 rounded-xl shadow-xl border z-50 py-1", openMenuId === 'detail' ? 'block' : 'hidden', theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
                         <div className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wider", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Move to</div>
                         {allFolders.filter(f => f.id !== selectedEmail.folder).map(f => (
                           <button 
                             key={f.id} 
-                            onClick={() => handleMove(selectedEmail, f.id)} 
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleMove(selectedEmail, f.id); }} 
                             className={cn("w-full text-left px-4 py-2 text-sm flex items-center gap-2", theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')}
                           >
                             <f.icon className="w-4 h-4 text-gray-400" />
@@ -927,18 +938,18 @@ function MainApp() {
                         </button>
                         <div className="relative group/folder">
                           <button 
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === email.id ? null : email.id); }}
                             className={cn("p-1.5 rounded-full", theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
                             title="Move to folder"
                           >
                             <Folder className="w-4 h-4" />
                           </button>
-                          <div className={cn("absolute right-0 mt-1 w-48 rounded-xl shadow-xl border hidden group-hover/folder:block z-50 py-1", theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
+                          <div className={cn("absolute right-0 mt-1 w-48 rounded-xl shadow-xl border z-50 py-1", openMenuId === email.id ? 'block' : 'hidden', theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100')}>
                             <div className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wider", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Move to</div>
                             {allFolders.filter(f => f.id !== email.folder).map(f => (
                               <button 
                                 key={f.id} 
-                                onClick={(e) => { e.stopPropagation(); handleMove(email, f.id); }} 
+                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleMove(email, f.id); }} 
                                 className={cn("w-full text-left px-4 py-2 text-sm flex items-center gap-2", theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50')}
                               >
                                 <f.icon className="w-4 h-4 text-gray-400" />
