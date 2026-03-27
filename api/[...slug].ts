@@ -45,7 +45,7 @@ const getSmtpClient = (user: string, pass: string) => {
 };
 
 // Verify IMAP credentials
-app.post("/api/verify", async (req, res) => {
+app.post(["/api/verify", "/verify"], async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Missing credentials" });
 
@@ -60,7 +60,7 @@ app.post("/api/verify", async (req, res) => {
 });
 
 // Sync emails
-app.post("/api/sync", async (req, res) => {
+app.post(["/api/sync", "/sync"], async (req, res) => {
   const { email, password, folder = 'INBOX', since } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Missing credentials" });
 
@@ -151,7 +151,7 @@ app.post("/api/sync", async (req, res) => {
 });
 
 // Move email
-app.post("/api/move", async (req, res) => {
+app.post(["/api/move", "/move"], async (req, res) => {
   const { email, password, folder, uid, destination } = req.body;
   if (!email || !password || !folder || !uid || !destination) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -176,7 +176,7 @@ app.post("/api/move", async (req, res) => {
 });
 
 // Save Draft
-app.post("/api/draft", upload.array('attachments'), async (req, res) => {
+app.post(["/api/draft", "/draft"], upload.array('attachments'), async (req, res) => {
   const { email, password, to, subject, text, html, previousUid } = req.body;
   const files = req.files as Express.Multer.File[];
   
@@ -227,7 +227,7 @@ app.post("/api/draft", upload.array('attachments'), async (req, res) => {
 });
 
 // Create Folder
-app.post("/api/create-folder", async (req, res) => {
+app.post(["/api/create-folder", "/create-folder"], async (req, res) => {
   const { email, password, folderName } = req.body;
   if (!email || !password || !folderName) return res.status(400).json({ error: "Missing required fields" });
 
@@ -244,7 +244,7 @@ app.post("/api/create-folder", async (req, res) => {
 });
 
 // Mark email
-app.post("/api/mark", async (req, res) => {
+app.post(["/api/mark", "/mark"], async (req, res) => {
   const { email, password, folder, uid, action } = req.body;
   if (!email || !password || !folder || !uid || !action) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -276,7 +276,7 @@ app.post("/api/mark", async (req, res) => {
 });
 
 // Send email
-app.post("/api/send", upload.array('attachments'), async (req, res) => {
+app.post(["/api/send", "/send"], upload.array('attachments'), async (req, res) => {
   const { email, password, to, subject, text, html, draftUid } = req.body;
   const files = req.files as Express.Multer.File[];
   
@@ -331,6 +331,11 @@ app.post("/api/send", upload.array('attachments'), async (req, res) => {
     console.error("Send error:", error);
     res.status(500).json({ error: error.message || "Send failed" });
   }
+});
+
+// Catch-all to prevent empty/HTML responses for unmatched routes
+app.use((req, res) => {
+  res.status(404).json({ error: `Not Found: ${req.method} ${req.url}` });
 });
 
 export default app;

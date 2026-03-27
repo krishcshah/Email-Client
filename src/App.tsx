@@ -1046,8 +1046,15 @@ export default function App() {
       body: JSON.stringify({ email, password: pass })
     });
     if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Invalid credentials');
+      let errorMessage = 'Invalid credentials';
+      try {
+        const data = await res.json();
+        errorMessage = data.error || errorMessage;
+      } catch (e) {
+        const text = await res.text();
+        errorMessage = `Server Error (${res.status}): ${text || 'Empty response'}`;
+      }
+      throw new Error(errorMessage);
     }
     try {
       await signInWithEmailAndPassword(auth, email, pass);
