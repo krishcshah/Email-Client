@@ -26,10 +26,21 @@ service cloud.firestore {
              data.userId == request.auth.uid;
     }
 
+    function isValidFolder(data) {
+      return data.keys().hasAll(['name']) && data.name is string;
+    }
+
     match /users/{userId}/emails/{emailId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && isValidEmail(request.resource.data);
       allow update: if isOwner(userId) && isValidEmail(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/folders/{folderId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidFolder(request.resource.data);
+      allow update: if isOwner(userId) && isValidFolder(request.resource.data);
       allow delete: if isOwner(userId);
     }
   }

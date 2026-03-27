@@ -1,12 +1,64 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
 import { Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
 
 // --- Types ---
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const currentUser = auth.currentUser;
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: currentUser?.uid,
+      email: currentUser?.email,
+      emailVerified: currentUser?.emailVerified,
+      isAnonymous: currentUser?.isAnonymous,
+      tenantId: currentUser?.tenantId,
+      providerInfo: currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 type Email = {
   id: string;
   uid: number;
@@ -322,12 +374,16 @@ function MainApp() {
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(doc => doc.data() as Email);
       setEmails(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${user.uid}/emails`);
     });
 
     const fq = query(collection(db, `users/${user.uid}/folders`));
     const unsubF = onSnapshot(fq, (snap) => {
       const fetchedFolders = snap.docs.map(doc => doc.data().name as string);
       setCustomFolders(fetchedFolders);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${user.uid}/folders`);
     });
 
     return () => {
@@ -352,13 +408,19 @@ function MainApp() {
       });
       if (res.ok) {
         const data = await res.json();
-        // Save to Firestore
+        // Save to Firestore using writeBatch
+        const batch = writeBatch(db);
         for (const email of data.emails) {
           const emailData = { ...email, userId: user.uid };
-          await setDoc(doc(db, `users/${user.uid}/emails`, email.id), emailData, { merge: true });
+          const emailRef = doc(db, `users/${user.uid}/emails`, email.id);
+          batch.set(emailRef, emailData, { merge: true });
         }
+        await batch.commit();
       }
     } catch (err) {
+      if (err instanceof Error && err.message.includes('permission')) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/emails`);
+      }
       console.error('Sync failed', err);
     } finally {
       setSyncing(false);
@@ -378,7 +440,11 @@ function MainApp() {
     if (action === 'delete') updates.localDeleted = true;
     if (action === 'restore') updates.localDeleted = false;
     
-    await setDoc(emailRef, updates, { merge: true });
+    try {
+      await setDoc(emailRef, updates, { merge: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/emails/${email.id}`);
+    }
 
     // Server update (except for delete and restore)
     if (action !== 'delete' && action !== 'restore') {
@@ -405,7 +471,11 @@ function MainApp() {
     
     // Optimistic update
     const emailRef = doc(db, `users/${user.uid}/emails`, email.id);
-    await setDoc(emailRef, { folder: destination }, { merge: true });
+    try {
+      await setDoc(emailRef, { folder: destination }, { merge: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/emails/${email.id}`);
+    }
     setSelectedEmail(null);
 
     // Server update
@@ -459,8 +529,7 @@ function MainApp() {
       setNewFolderName('');
       setShowNewFolder(false);
     } catch (err) {
-      console.error("Failed to create folder", err);
-      alert("Failed to create folder");
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/folders`);
     }
   };
   const draftsCount = emails.filter(e => e.folder.toUpperCase() === 'DRAFTS' && !e.localDeleted).length;
@@ -995,9 +1064,13 @@ export default function App() {
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
+  const isUserMatching = activeAccount && user && user.email === activeAccount.email;
+
   return (
     <AuthContext.Provider value={{ user, activeAccount, accounts, login, switchAccount, logoutAccount }}>
-      {activeAccount ? <MainApp /> : <Login />}
+      {activeAccount ? (
+        isUserMatching ? <MainApp key={activeAccount.email} /> : <div className="h-screen flex items-center justify-center">Switching account...</div>
+      ) : <Login />}
     </AuthContext.Provider>
   );
 }
