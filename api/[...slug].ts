@@ -7,7 +7,16 @@ import MailComposer from "nodemailer/lib/mail-composer/index.js";
 
 const app = express();
 
-app.use(express.json({ limit: '50mb' }));
+// Custom middleware to handle Vercel's automatic body parsing
+app.use((req, res, next) => {
+  if (req.body !== undefined) {
+    // Vercel already parsed the body (or it's empty)
+    next();
+  } else {
+    // Local development where req.body is undefined
+    express.json({ limit: '50mb' })(req, res, next);
+  }
+});
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -323,11 +332,5 @@ app.post("/api/send", upload.array('attachments'), async (req, res) => {
     res.status(500).json({ error: error.message || "Send failed" });
   }
 });
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 export default app;
