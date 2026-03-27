@@ -112,7 +112,8 @@ function Login({ onCancel }: { onCancel?: () => void }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { theme, toggleTheme } = useContext(ThemeContext);
+  const { theme, setTheme } = useContext(ThemeContext);
+  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
   const isDark = theme === 'dark';
 
   const handleLogin = async (e: React.FormEvent) => {
