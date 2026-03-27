@@ -3,7 +3,7 @@ import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
 import { simpleParser } from "mailparser";
 import multer from "multer";
-import MailComposer from "nodemailer/lib/mail-composer";
+import MailComposer from "nodemailer/lib/mail-composer/index.js";
 
 const app = express();
 
@@ -323,5 +323,11 @@ app.post("/api/send", upload.array('attachments'), async (req, res) => {
     res.status(500).json({ error: error.message || "Send failed" });
   }
 });
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
 export default app;
