@@ -245,6 +245,22 @@ app.post(["/api/create-folder", "/create-folder"], async (req, res) => {
   }
 });
 
+app.post(["/api/delete-folder", "/delete-folder"], async (req, res) => {
+  const { email, password, folderName } = req.body;
+  if (!email || !password || !folderName) return res.status(400).json({ error: "Missing required fields" });
+
+  const client = getImapClient(email, password);
+  try {
+    await client.connect();
+    await client.mailboxDelete(folderName);
+    await client.logout();
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Delete folder error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Mark email
 app.post(["/api/mark", "/mark"], async (req, res) => {
   const { email, password, folder, uid, action } = req.body;
