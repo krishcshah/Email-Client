@@ -2,7 +2,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch, where, deleteDoc } from 'firebase/firestore';
-import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell, AlertCircle } from 'lucide-react';
+import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
 
@@ -246,6 +246,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [draftUid, setDraftUid] = useState<string | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     if (!activeAccount) return;
@@ -352,12 +353,23 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
   };
 
   return (
-    <div className={cn("fixed bottom-0 right-24 w-[500px] rounded-t-xl shadow-2xl border flex flex-col z-50", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200')}>
-      <div className="bg-gray-800 text-white px-4 py-3 rounded-t-xl flex justify-between items-center">
+    <div className={cn(
+      "fixed flex flex-col shadow-2xl border z-50 transition-all duration-200", 
+      document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200',
+      isFullScreen 
+        ? "inset-4 sm:inset-10 rounded-xl" 
+        : "bottom-0 right-4 sm:right-24 w-auto sm:w-[500px] h-[500px] rounded-t-xl"
+    )}>
+      <div className={cn("bg-gray-800 text-white px-4 py-3 flex justify-between items-center", isFullScreen ? "rounded-t-xl" : "rounded-t-xl")}>
         <span className="font-medium text-sm">New Message</span>
-        <button onClick={handleCloseCompose} className="hover:bg-gray-700 p-1 rounded"><X className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setIsFullScreen(!isFullScreen)} className="hover:bg-gray-700 p-1 rounded">
+            {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+          <button type="button" onClick={handleCloseCompose} className="hover:bg-gray-700 p-1 rounded"><X className="w-4 h-4" /></button>
+        </div>
       </div>
-      <form onSubmit={handleSend} className="flex flex-col flex-1">
+      <form onSubmit={handleSend} className="flex flex-col flex-1 overflow-hidden">
         <div className={cn("border-b flex items-center pr-4", document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100')}>
           <input
             type="text"
@@ -401,7 +413,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
           onChange={(e) => setSubject(e.target.value)}
         />
         <textarea
-          className={cn("flex-1 p-4 outline-none resize-none text-sm min-h-[300px]", document.documentElement.classList.contains('dark') ? 'bg-gray-900 text-gray-100 placeholder-gray-500' : 'bg-white text-gray-900')}
+          className={cn("flex-1 p-4 outline-none resize-none text-sm min-h-[200px]", document.documentElement.classList.contains('dark') ? 'bg-gray-900 text-gray-100 placeholder-gray-500' : 'bg-white text-gray-900')}
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
