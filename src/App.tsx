@@ -63,6 +63,7 @@ type Email = {
   id: string;
   uid: number;
   folder: string;
+  previousFolder?: string;
   subject: string;
   from: string;
   to: string;
@@ -580,11 +581,11 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
 
   const handleMove = async (email: Email, destination: string) => {
     if (!user || !activeAccount) return;
-    
+
     // Optimistic update
     const emailRef = doc(db, `users/${user.uid}/emails`, email.id);
     try {
-      await setDoc(emailRef, { folder: destination }, { merge: true });
+      await setDoc(emailRef, { folder: destination, previousFolder: email.folder }, { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/emails/${email.id}`);
     }
@@ -648,7 +649,15 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   const handleDeleteFolder = async (folderName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user || !activeAccount) return;
-    if (!window.confirm(`Are you sure you want to delete the folder "${folderName}"?`)) return;
+    if (!window.confirm(`Are you sure you want to delete the folder "${folderName}" and move its contents back to their original folders?`)) return;
+
+    const folderEmails = emails.filter(email => email.folder === folderName);
+    const moves: Record<string, number[]> = {};
+    for (const email of folderEmails) {
+      const dest = email.previousFolder || 'INBOX';
+      if (!moves[dest]) moves[dest] = [];
+      moves[dest].push(email.uid);
+    }
 
     try {
       await fetch('/api/delete-folder', {
@@ -657,11 +666,21 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
         body: JSON.stringify({
           email: activeAccount.email,
           password: activeAccount.pass,
-          folderName: folderName
+          folderName: folderName,
+          moves: moves
         })
       });
 
-      await deleteDoc(doc(db, `users/${user.uid}/folders`, folderName));
+      // Update Firestore optimistic batch
+      const batch = writeBatch(db);
+      folderEmails.forEach(email => {
+        const dest = email.previousFolder || 'INBOX';
+        const ref = doc(db, `users/${user.uid}/emails`, email.id);
+        batch.update(ref, { folder: dest, previousFolder: null });
+      });
+      batch.delete(doc(db, `users/${user.uid}/folders`, folderName));
+      await batch.commit();
+
       if (selectedFolder === folderName) {
         setSelectedFolder('INBOX');
       }

@@ -246,12 +246,27 @@ app.post(["/api/create-folder", "/create-folder"], async (req, res) => {
 });
 
 app.post(["/api/delete-folder", "/delete-folder"], async (req, res) => {
-  const { email, password, folderName } = req.body;
+  const { email, password, folderName, moves } = req.body;
   if (!email || !password || !folderName) return res.status(400).json({ error: "Missing required fields" });
 
   const client = getImapClient(email, password);
   try {
     await client.connect();
+
+    if (moves && Object.keys(moves).length > 0) {
+      const lock = await client.getMailboxLock(folderName);
+      try {
+        for (const [dest, uids] of Object.entries(moves)) {
+          if (Array.isArray(uids) && uids.length > 0) {
+            try { await client.mailboxCreate(dest); } catch (e) {} // Ensure destination exists
+            await client.messageMove(uids.join(','), dest, { uid: true });
+          }
+        }
+      } finally {
+        lock.release();
+      }
+    }
+
     await client.mailboxDelete(folderName);
     await client.logout();
     res.json({ success: true });
