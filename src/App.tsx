@@ -2,7 +2,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch, where, deleteDoc } from 'firebase/firestore';
-import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
+import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell, AlertCircle, Maximize2, Minimize2, Bold, Italic, Underline, List, ListOrdered, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
 
@@ -243,6 +243,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState('');
+  const editorRef = React.useRef<HTMLDivElement>(null);
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [draftUid, setDraftUid] = useState<string | null>(null);
@@ -260,8 +261,8 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       if (cc) formData.append('cc', cc);
       if (bcc) formData.append('bcc', bcc);
       formData.append('subject', subject);
-      formData.append('text', body);
-      formData.append('html', body.replace(/\n/g, '<br/>'));
+      formData.append('text', editorRef.current?.innerText || '');
+      formData.append('html', body);
       if (draftUid) formData.append('previousUid', draftUid);
       attachments.forEach(file => formData.append('attachments', file));
       
@@ -300,8 +301,8 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       if (cc) formData.append('cc', cc);
       if (bcc) formData.append('bcc', bcc);
       formData.append('subject', subject);
-      formData.append('text', body);
-      formData.append('html', body.replace(/\n/g, '<br/>'));
+      formData.append('text', editorRef.current?.innerText || '');
+      formData.append('html', body);
       if (draftUid) formData.append('draftUid', draftUid);
       
       attachments.forEach(file => {
@@ -322,6 +323,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       setBcc('');
       setSubject('');
       setBody('');
+      if (editorRef.current) editorRef.current.innerHTML = '';
       setAttachments([]);
       
       onClose();
@@ -341,8 +343,8 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       if (cc) formData.append('cc', cc);
       if (bcc) formData.append('bcc', bcc);
       formData.append('subject', subject);
-      formData.append('text', body);
-      formData.append('html', body.replace(/\n/g, '<br/>'));
+      formData.append('text', editorRef.current?.innerText || '');
+      formData.append('html', body);
       if (draftUid) formData.append('previousUid', draftUid);
       attachments.forEach(file => formData.append('attachments', file));
       
@@ -350,6 +352,20 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       fetch('/api/draft', { method: 'POST', body: formData }).catch(console.error);
     }
     onClose();
+  };
+
+  const handleFormat = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+    if (editorRef.current) {
+      setBody(editorRef.current.innerHTML);
+    }
+  };
+
+  const handleEditorInput = () => {
+    if (editorRef.current) {
+      setBody(editorRef.current.innerHTML);
+    }
   };
 
   return (
@@ -412,10 +428,24 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
         />
-        <textarea
-          className={cn("flex-1 p-4 outline-none resize-none text-sm min-h-[200px]", document.documentElement.classList.contains('dark') ? 'bg-gray-900 text-gray-100 placeholder-gray-500' : 'bg-white text-gray-900')}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
+        <div className={cn("flex flex-wrap items-center gap-1 border-b px-2 py-1", document.documentElement.classList.contains('dark') ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-gray-50')}>
+          <button type="button" onClick={() => handleFormat('bold')} className={cn("p-1.5 rounded", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700')} title="Bold"><Bold className="w-4 h-4" /></button>
+          <button type="button" onClick={() => handleFormat('italic')} className={cn("p-1.5 rounded", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700')} title="Italic"><Italic className="w-4 h-4" /></button>
+          <button type="button" onClick={() => handleFormat('underline')} className={cn("p-1.5 rounded", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700')} title="Underline"><Underline className="w-4 h-4" /></button>
+          <div className={cn("w-px h-4 mx-1", document.documentElement.classList.contains('dark') ? 'bg-gray-700' : 'bg-gray-300')}></div>
+          <button type="button" onClick={() => handleFormat('insertUnorderedList')} className={cn("p-1.5 rounded", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700')} title="Bullet List"><List className="w-4 h-4" /></button>
+          <button type="button" onClick={() => handleFormat('insertOrderedList')} className={cn("p-1.5 rounded", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700')} title="Numbered List"><ListOrdered className="w-4 h-4" /></button>
+          <div className={cn("w-px h-4 mx-1", document.documentElement.classList.contains('dark') ? 'bg-gray-700' : 'bg-gray-300')}></div>
+          <button type="button" onClick={() => {
+            const url = prompt('Enter link URL:');
+            if (url) handleFormat('createLink', url);
+          }} className={cn("p-1.5 rounded", document.documentElement.classList.contains('dark') ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700')} title="Insert Link"><Link2 className="w-4 h-4" /></button>
+        </div>
+        <div
+          ref={editorRef}
+          contentEditable
+          onInput={handleEditorInput}
+          className={cn("flex-1 p-4 outline-none overflow-y-auto text-sm min-h-[200px] prose", document.documentElement.classList.contains('dark') ? 'bg-gray-900 text-gray-100 prose-invert max-w-none' : 'bg-white text-gray-900 max-w-none')}
         />
         {attachments.length > 0 && (
           <div className={cn("px-4 py-2 flex flex-wrap gap-2 border-t", document.documentElement.classList.contains('dark') ? 'border-gray-800' : 'border-gray-100')}>
@@ -1296,4 +1326,5 @@ export default function App() {
     </ThemeContext.Provider>
   );
 }
+
 
