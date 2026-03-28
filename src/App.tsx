@@ -2,7 +2,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, getDocs, writeBatch, where, deleteDoc } from 'firebase/firestore';
-import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell } from 'lucide-react';
+import { Sun, Moon, Mail, Send, File, Trash2, Search, Menu, Plus, RefreshCw, ChevronLeft, ChevronRight, User as UserIcon, X, Star, MailOpen, Folder, Bell, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
 
@@ -437,7 +437,7 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
 }
 
 
-function MainApp({ onLogout }: { onLogout: () => void }) {
+function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   const { user, activeAccount, accounts, switchAccount, logoutAccount } = useContext(AuthContext);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedFolder, setSelectedFolder] = useState('INBOX');
@@ -1278,7 +1278,7 @@ export default function App() {
     <ThemeContext.Provider value={{ theme, setTheme }}>
       <AuthContext.Provider value={{ user, activeAccount, accounts, login, switchAccount, logoutAccount }}>
         {activeAccount ? (
-          isUserMatching ? <MainApp key={activeAccount.email} /> : <div className={cn("h-screen flex items-center justify-center", theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900')}>Switching account...</div>
+          isUserMatching ? <MainApp key={activeAccount.email} onLogout={() => logoutAccount(activeAccount.email)} /> : <div className={cn("h-screen flex items-center justify-center", theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900')}>Switching account...</div>
         ) : <Login />}
       </AuthContext.Provider>
     </ThemeContext.Provider>
