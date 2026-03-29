@@ -1087,6 +1087,16 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                     >
                       Reply
                     </button>
+                    <button 
+                      onClick={() => {
+                        handleMark(selectedEmail, 'delete');
+                        setSelectedEmail(null);
+                      }}
+                      className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}
+                      title="Delete"
+                    >
+                      <Trash2 className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
+                    </button>
                     <div className="relative">
                       <button 
                         onClick={(e) => { e.stopPropagation(); setOpenMoveMenuId(openMoveMenuId === selectedEmail.id ? null : selectedEmail.id); }}
