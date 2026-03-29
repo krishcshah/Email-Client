@@ -498,6 +498,40 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Prevent immediate app exit on mobile back button and use it to close overlays
+  useEffect(() => {
+    window.history.pushState(null, '', window.location.href);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      let preventedExit = false;
+
+      if (isSidebarOpen && window.innerWidth < 1024) {
+        setIsSidebarOpen(false);
+        preventedExit = true;
+      } else if (isComposing) {
+        setIsComposing(false);
+        preventedExit = true;
+      } else if (selectedEmail) {
+        setSelectedEmail(null);
+        preventedExit = true;
+      } else if (showProfileMenu) {
+        setShowProfileMenu(false);
+        preventedExit = true;
+      }
+
+      if (preventedExit) {
+        // Restore the dummy state so they can't exit accidentally
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isSidebarOpen, isComposing, selectedEmail, showProfileMenu]);
+
   const [logoutConfirmAccount, setLogoutConfirmAccount] = useState<string | null>(null);
   const [openMoveMenuId, setOpenMoveMenuId] = useState<string | null>(null);
 
