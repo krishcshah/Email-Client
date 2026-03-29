@@ -919,9 +919,10 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         )}
 
         {/* Sidebar */}
-        <aside className={cn("fixed inset-y-0 left-0 lg:relative z-40 w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-transform duration-200 lg:translate-x-0 h-full", 
+        <aside className={cn(
+          "fixed inset-y-0 left-0 z-40 p-3 flex flex-col gap-1 border-r shrink-0 transition-all duration-300 h-full", 
           theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white',
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          isSidebarOpen ? "translate-x-0 w-64 shadow-2xl lg:shadow-none" : "-translate-x-full w-64 lg:translate-x-0 lg:w-[72px]"
         )}>
           {/* Mobile Logo */}
           <div className="flex items-center justify-between px-4 py-2 mb-2 lg:hidden">
@@ -945,13 +946,17 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
               setIsComposing(true);
               if (window.innerWidth < 1024) setIsSidebarOpen(false);
             }}
-            className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl font-medium mb-4 w-fit transition-colors shadow-sm", theme === 'dark' ? 'bg-blue-900 hover:bg-blue-800 text-blue-100' : 'bg-[#c2e7ff] hover:bg-[#b5dfff] text-[#001d35]')}
+            className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl font-medium mb-4 transition-colors shadow-sm", 
+              theme === 'dark' ? 'bg-blue-900 hover:bg-blue-800 text-blue-100' : 'bg-[#c2e7ff] hover:bg-[#b5dfff] text-[#001d35]',
+              isSidebarOpen ? "w-fit" : "w-12 h-12 justify-center ml-1"
+            )}
+            title={!isSidebarOpen ? "Compose" : undefined}
           >
-            <Plus className="w-6 h-6" />
-            Compose
+            <Plus className="w-6 h-6 shrink-0" />
+            <span className={cn("whitespace-nowrap transition-opacity", isSidebarOpen ? "opacity-100" : "opacity-0 hidden")}>Compose</span>
           </button>
           
-          <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-1 flex-1 overflow-y-auto overflow-x-hidden">
             {allFolders.map(f => (
               <button
                 key={f.id}
@@ -962,33 +967,37 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                   if (window.innerWidth < 1024) setIsSidebarOpen(false);
                 }}
                 className={cn(
-                  "flex items-center justify-between px-6 py-2 rounded-r-full font-medium text-sm transition-colors",
+                  "flex items-center justify-between py-2 rounded-r-full font-medium text-sm transition-colors",
                   selectedFolder === f.id 
                     ? (theme === 'dark' ? "bg-blue-900/50 text-blue-300" : "bg-[#d3e3fd] text-[#0b57d0]") 
-                    : (theme === 'dark' ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100")
+                    : (theme === 'dark' ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"),
+                  isSidebarOpen ? "px-6" : "px-0 justify-center w-12 ml-1 rounded-full"
                 )}
+                title={!isSidebarOpen ? f.name : undefined}
               >
-                <div className="flex items-center gap-4">
-                  <f.icon className="w-4 h-4" />
-                  {f.name}
+                <div className={cn("flex items-center gap-4", !isSidebarOpen && "justify-center w-full")}>
+                  <f.icon className="w-4 h-4 shrink-0" />
+                  <span className={cn("whitespace-nowrap transition-opacity", isSidebarOpen ? "opacity-100" : "opacity-0 hidden")}>{f.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {f.count !== undefined && f.count > 0 && (
-                    <span className="text-xs font-bold">{f.count}</span>
-                  )}
-                  {customFolders.includes(f.id) && (
-                    <div
-                      role="button"
-                      onClick={(e) => handleDeleteFolder(f.id, e)}
-                      className={cn("p-1.5 rounded-full transition-colors", 
-                        theme === 'dark' ? "text-gray-400 hover:text-red-400 hover:bg-gray-700/50" : "text-gray-500 hover:text-red-500 hover:bg-gray-200/50"
-                      )}
-                      title="Delete folder"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </div>
-                  )}
-                </div>
+                {isSidebarOpen && (
+                  <div className="flex items-center gap-2">
+                    {f.count !== undefined && f.count > 0 && (
+                      <span className="text-xs font-bold">{f.count}</span>
+                    )}
+                    {customFolders.includes(f.id) && (
+                      <div
+                        role="button"
+                        onClick={(e) => handleDeleteFolder(f.id, e)}
+                        className={cn("p-1.5 rounded-full transition-colors", 
+                          theme === 'dark' ? "text-gray-400 hover:text-red-400 hover:bg-gray-700/50" : "text-gray-500 hover:text-red-500 hover:bg-gray-200/50"
+                        )}
+                        title="Delete folder"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                      </div>
+                    )}
+                  </div>
+                )}
               </button>
             ))}
 
@@ -1006,16 +1015,24 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
               </form>
             ) : (
               <button
-                onClick={() => setShowNewFolder(true)}
-                className={cn("flex items-center gap-4 px-6 py-2 rounded-r-full font-medium text-sm transition-colors mt-2", theme === 'dark' ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100')}
+                onClick={() => {
+                  if (!isSidebarOpen && window.innerWidth >= 1024) setIsSidebarOpen(true);
+                  setShowNewFolder(true);
+                }}
+                className={cn("flex items-center gap-4 py-2 rounded-r-full font-medium text-sm transition-colors mt-2", 
+                  theme === 'dark' ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100',
+                  isSidebarOpen ? "px-6" : "px-0 justify-center w-12 ml-1 rounded-full"
+                )}
+                title={!isSidebarOpen ? "Create Folder" : undefined}
               >
-                <Plus className="w-4 h-4" />
-                Create Folder
+                <Plus className="w-4 h-4 shrink-0" />
+                <span className={cn("whitespace-nowrap transition-opacity", isSidebarOpen ? "opacity-100" : "opacity-0 hidden")}>Create Folder</span>
               </button>
             )}
           </div>
 
-          <div className="mt-auto pt-4 px-4 hidden lg:block">
+          {isSidebarOpen && (
+            <div className="mt-auto pt-4 px-4 hidden lg:block">
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className={cn(
@@ -1042,6 +1059,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
               </div>
             </button>
           </div>
+          )}
         </aside>
 
         {/* Main Content */}
