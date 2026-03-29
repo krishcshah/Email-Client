@@ -235,19 +235,37 @@ function Login({ onCancel }: { onCancel?: () => void }) {
   );
 }
 
-function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClose: () => void, initialTo?: string, initialSubject?: string }) {
+function ComposeModal({ 
+  onClose, 
+  initialTo = '', 
+  initialSubject = '',
+  initialBody = '',
+  initialDraftUid = null
+}: { 
+  onClose: () => void, 
+  initialTo?: string, 
+  initialSubject?: string,
+  initialBody?: string,
+  initialDraftUid?: string | null
+}) {
   const { user, activeAccount } = useContext(AuthContext);
   const [to, setTo] = useState(initialTo);
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [subject, setSubject] = useState(initialSubject);
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(initialBody);
   const editorRef = React.useRef<HTMLDivElement>(null);
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [draftUid, setDraftUid] = useState<string | null>(null);
+  const [draftUid, setDraftUid] = useState<string | null>(initialDraftUid);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (editorRef.current && initialBody && !editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = initialBody;
+    }
+  }, [initialBody]);
 
   useEffect(() => {
     if (!activeAccount) return;
@@ -485,7 +503,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   const [selectedFolder, setSelectedFolder] = useState('INBOX');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [isComposing, setIsComposing] = useState(false);
-  const [replyData, setReplyData] = useState<{to: string, subject: string} | null>(null);
+  const [composeData, setComposeData] = useState<{to?: string, subject?: string, body?: string, draftUid?: string | null} | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -942,7 +960,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
 
           <button 
             onClick={() => {
-              setReplyData(null);
+              setComposeData(null);
               setIsComposing(true);
               if (window.innerWidth < 1024) setIsSidebarOpen(false);
             }}
@@ -1149,7 +1167,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                     </button>
                     <button 
                       onClick={() => {
-                        setReplyData({
+                        setComposeData({
                           to: selectedEmail.from,
                           subject: selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`
                         });
@@ -1203,8 +1221,18 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                     <div 
                       key={email.id}
                       onClick={() => {
-                        setSelectedEmail(email);
-                        if (!email.read) handleMark(email, 'read');
+                        if (email.folder.toUpperCase() === 'DRAFTS') {
+                          setComposeData({
+                            to: email.to,
+                            subject: email.subject,
+                            body: email.body,
+                            draftUid: email.uid.toString()
+                          });
+                          setIsComposing(true);
+                        } else {
+                          setSelectedEmail(email);
+                          if (!email.read) handleMark(email, 'read');
+                        }
                       }}
                       className={cn(
                         "flex flex-col sm:flex-row sm:items-center px-4 py-3 sm:py-2 cursor-pointer transition-shadow group border-b relative gap-1 sm:gap-0",
@@ -1305,7 +1333,13 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         </main>
       </div>
 
-      {isComposing && <ComposeModal onClose={() => setIsComposing(false)} initialTo={replyData?.to} initialSubject={replyData?.subject} />}
+      {isComposing && <ComposeModal 
+        onClose={() => setIsComposing(false)} 
+        initialTo={composeData?.to} 
+        initialSubject={composeData?.subject} 
+        initialBody={composeData?.body}
+        initialDraftUid={composeData?.draftUid}
+      />}
       {showAddAccount && <Login onCancel={() => setShowAddAccount(false)} />}
       
       {logoutConfirmAccount && (
