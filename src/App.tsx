@@ -373,8 +373,8 @@ function ComposeModal({ onClose, initialTo = '', initialSubject = '' }: { onClos
       "fixed flex flex-col shadow-2xl border z-50 transition-all duration-200", 
       document.documentElement.classList.contains('dark') ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200',
       isFullScreen 
-        ? "inset-4 sm:inset-10 rounded-xl" 
-        : "bottom-0 right-4 sm:right-24 w-auto sm:w-[500px] h-[500px] rounded-t-xl"
+        ? "inset-0 sm:inset-10 sm:rounded-xl" 
+        : "bottom-0 left-0 right-0 sm:left-auto sm:right-24 sm:w-[500px] h-[90vh] sm:h-[500px] rounded-t-xl"
     )}>
       <div className={cn("bg-gray-800 text-white px-4 py-3 flex justify-between items-center", isFullScreen ? "rounded-t-xl" : "rounded-t-xl")}>
         <span className="font-medium text-sm">New Message</span>
@@ -489,7 +489,15 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   const [syncing, setSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAddAccount, setShowAddAccount] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsSidebarOpen(window.innerWidth >= 1024);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [logoutConfirmAccount, setLogoutConfirmAccount] = useState<string | null>(null);
   const [openMoveMenuId, setOpenMoveMenuId] = useState<string | null>(null);
 
@@ -773,9 +781,14 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
     <div className={cn("h-screen flex flex-col overflow-hidden transition-colors duration-200", theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900')}>
       {/* Header */}
       <header className={cn("h-16 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white')}>
-        <div className="flex items-center gap-4 w-64">
-          <button className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}><Menu className="w-5 h-5" /></button>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 lg:w-64">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-600')}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="hidden sm:flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
               <Mail className="w-5 h-5 text-white" />
             </div>
@@ -783,9 +796,9 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
           </div>
         </div>
         
-        <div className="flex-1 max-w-2xl px-8">
+        <div className="flex-1 max-w-2xl px-2 sm:px-8">
           <div className={cn("rounded-full flex items-center px-4 py-2 focus-within:shadow-md focus-within:ring-1 transition-all", theme === 'dark' ? 'bg-gray-800 focus-within:bg-gray-800 focus-within:ring-gray-700' : 'bg-gray-100 focus-within:bg-white focus-within:ring-gray-200')}>
-            <Search className={cn("w-5 h-5 mr-3", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')} />
+            <Search className={cn("w-5 h-5 mr-2 sm:mr-3", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')} />
             <input 
               type="text" 
               placeholder="Search mail" 
@@ -796,7 +809,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 w-64 justify-end relative">
+        <div className="flex items-center gap-2 sm:gap-4 lg:w-64 justify-end relative">
           <button 
             onClick={() => setShowProfileMenu(!showProfileMenu)} 
             className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center font-medium hover:ring-2 hover:ring-purple-300 transition-all"
@@ -805,7 +818,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
           </button>
 
           {showProfileMenu && (
-            <div className={cn("absolute top-10 right-0 mt-2 w-72 rounded-xl shadow-xl border z-50 py-2", theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100')}>
+            <div className={cn("absolute top-10 right-0 mt-2 w-64 sm:w-72 rounded-xl shadow-xl border z-50 py-2", theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100')}>
               <div className={cn("px-4 py-3 border-b", theme === 'dark' ? 'border-gray-800' : 'border-gray-100')}>
                 <div className={cn("text-xs mb-1", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>Current account</div>
                 <div className={cn("font-medium text-sm truncate", theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}>{activeAccount?.email}</div>
@@ -862,13 +875,25 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className={cn("w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white')}>
+        <aside className={cn("absolute lg:relative z-30 h-full w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-transform duration-200", 
+          theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white',
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"
+        )}>
           <button 
             onClick={() => {
               setReplyData(null);
               setIsComposing(true);
+              if (window.innerWidth < 1024) setIsSidebarOpen(false);
             }}
             className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl font-medium mb-4 w-fit transition-colors shadow-sm", theme === 'dark' ? 'bg-blue-900 hover:bg-blue-800 text-blue-100' : 'bg-[#c2e7ff] hover:bg-[#b5dfff] text-[#001d35]')}
           >
@@ -884,6 +909,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                   setSelectedFolder(f.id);
                   setSelectedEmail(null);
                   syncEmails(f.id);
+                  if (window.innerWidth < 1024) setIsSidebarOpen(false);
                 }}
                 className={cn(
                   "flex items-center justify-between px-6 py-2 rounded-r-full font-medium text-sm transition-colors",
@@ -969,7 +995,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         </aside>
 
         {/* Main Content */}
-        <main className={cn("flex-1 flex flex-col overflow-hidden transition-colors duration-200", theme === 'dark' ? 'bg-gray-900' : 'bg-white')}>
+        <main className={cn("flex-1 flex flex-col overflow-hidden transition-colors duration-200 min-w-0", theme === 'dark' ? 'bg-gray-900' : 'bg-white')}>
           <div className={cn("h-12 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800' : 'border-gray-100')}>
             <div className="flex items-center gap-2">
               <button onClick={() => syncEmails(selectedFolder)} className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} disabled={syncing}>
@@ -982,7 +1008,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
           </div>
 
           {selectedEmail ? (
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <button 
                   onClick={() => setSelectedEmail(null)}
@@ -1018,18 +1044,18 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                   </button>
                 </div>
               </div>
-              <h2 className={cn("text-2xl font-normal mb-6", theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}>{selectedEmail.subject}</h2>
-              <div className="flex items-center justify-between mb-8">
+              <h2 className={cn("text-xl sm:text-2xl font-normal mb-6 break-words", theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}>{selectedEmail.subject}</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 sm:gap-0">
                 <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg", theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700')}>
+                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0", theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700')}>
                     {selectedEmail.from[0]?.toUpperCase() || '?'}
                   </div>
-                  <div>
-                    <div className={cn("font-medium text-sm", theme === 'dark' ? 'text-gray-200' : 'text-gray-900')}>{selectedEmail.from}</div>
-                    <div className={cn("text-xs", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>to {selectedEmail.to}</div>
+                  <div className="min-w-0">
+                    <div className={cn("font-medium text-sm truncate w-full", theme === 'dark' ? 'text-gray-200' : 'text-gray-900')}>{selectedEmail.from}</div>
+                    <div className={cn("text-xs truncate w-full", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>to {selectedEmail.to}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between sm:justify-end gap-4">
                   <div className={cn("text-xs", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>
                     {format(new Date(selectedEmail.date), 'MMM d, yyyy, h:mm a')}
                   </div>
@@ -1081,7 +1107,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                 </div>
               </div>
               <div 
-                className={cn("prose max-w-none text-sm", theme === 'dark' ? 'text-gray-300' : 'text-gray-800')}
+                className={cn("prose max-w-none text-sm break-words overflow-x-auto", theme === 'dark' ? 'text-gray-300' : 'text-gray-800')}
                 dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
               />
             </div>
@@ -1101,33 +1127,41 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                         if (!email.read) handleMark(email, 'read');
                       }}
                       className={cn(
-                        "flex items-center px-4 py-2 cursor-pointer transition-shadow group border-b relative",
+                        "flex flex-col sm:flex-row sm:items-center px-4 py-3 sm:py-2 cursor-pointer transition-shadow group border-b relative gap-1 sm:gap-0",
                         theme === 'dark' ? 'border-gray-800 hover:bg-gray-800' : 'border-gray-100 hover:shadow-md',
                         !email.read 
                           ? (theme === 'dark' ? "bg-gray-900 font-bold" : "bg-white font-bold") 
                           : (theme === 'dark' ? "bg-gray-900/50 text-gray-400" : "bg-gray-50/50 text-gray-600")
                       )}
                     >
-                      <div className="flex items-center gap-2 w-48 pr-4">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleMark(email, email.starred ? 'unstar' : 'star'); }}
-                          className={cn("p-1 rounded-full", theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200')}
-                        >
-                          <Star className={cn("w-4 h-4", email.starred ? "fill-yellow-400 text-yellow-400" : "text-gray-400")} />
-                        </button>
-                        <div className={cn("truncate text-sm", theme === 'dark' ? 'text-gray-300' : 'text-gray-900')}>
-                          {email.from.split('<')[0].trim() || email.from}
+                      <div className="flex items-center justify-between sm:w-48 sm:pr-4 w-full">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleMark(email, email.starred ? 'unstar' : 'star'); }}
+                            className={cn("p-1 rounded-full shrink-0", theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200')}
+                          >
+                            <Star className={cn("w-4 h-4", email.starred ? "fill-yellow-400 text-yellow-400" : "text-gray-400")} />
+                          </button>
+                          <div className={cn("truncate text-sm", theme === 'dark' ? 'text-gray-300' : 'text-gray-900')}>
+                            {email.from.split('<')[0].trim() || email.from}
+                          </div>
+                        </div>
+                        <div className={cn("sm:hidden shrink-0 text-xs font-medium ml-2", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
+                          {format(new Date(email.date), 'MMM d')}
                         </div>
                       </div>
-                      <div className="flex-1 truncate text-sm">
-                        <span className={cn("mr-2", !email.read ? (theme === 'dark' ? "text-gray-100" : "text-gray-900") : (theme === 'dark' ? "text-gray-400" : "text-gray-700"))}>
+                      <div className="flex flex-col sm:flex-row sm:flex-1 sm:items-center w-full truncate text-sm pl-8 sm:pl-0">
+                        <span className={cn("truncate sm:mr-2", !email.read ? (theme === 'dark' ? "text-gray-100" : "text-gray-900") : (theme === 'dark' ? "text-gray-400" : "text-gray-700"))}>
                           {email.subject || '(No Subject)'}
                         </span>
-                        <span className={cn("font-normal", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>
+                        <span className={cn("truncate font-normal hidden sm:inline", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>
                           - {email.snippet}
                         </span>
+                        <span className={cn("truncate font-normal sm:hidden text-xs mt-0.5", theme === 'dark' ? 'text-gray-500' : 'text-gray-500')}>
+                          {email.snippet}
+                        </span>
                       </div>
-                      <div className={cn("w-24 text-right text-xs font-medium pl-4 group-hover:hidden", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
+                      <div className={cn("hidden sm:block w-24 text-right text-xs font-medium pl-4 group-hover:hidden", theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}>
                         {format(new Date(email.date), 'MMM d')}
                       </div>
                       
