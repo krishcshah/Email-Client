@@ -747,9 +747,11 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   ];
 
   const filteredEmails = emails.filter(e => {
-    const matchesSearch = e.subject.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          e.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          e.snippet.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = e.subject.toLowerCase().includes(searchLower) || 
+                          e.from.toLowerCase().includes(searchLower) ||
+                          e.snippet.toLowerCase().includes(searchLower) ||
+                          (e.body && e.body.toLowerCase().includes(searchLower));
                           
     if (selectedFolder === 'Trash') {
       return (e.localDeleted || e.folder.toUpperCase() === 'TRASH') && matchesSearch;
