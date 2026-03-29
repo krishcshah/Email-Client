@@ -780,7 +780,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   return (
     <div className={cn("h-screen flex flex-col overflow-hidden transition-colors duration-200", theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900')}>
       {/* Header */}
-      <header className={cn("h-16 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white')}>
+      <header className={cn("relative z-10 h-16 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white')}>
         <div className="flex items-center gap-2 sm:gap-4 lg:w-64">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -885,16 +885,24 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         )}
 
         {/* Sidebar */}
-        <aside className={cn("absolute lg:relative z-30 h-full w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-transform duration-200", 
+        <aside className={cn("absolute lg:relative z-40 h-full w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-transform duration-200", 
           theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white',
           isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"
         )}>
           {/* Mobile Logo */}
-          <div className="flex items-center gap-2 px-4 py-2 mb-2 lg:hidden">
-            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-              <Mail className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-between px-4 py-2 mb-2 lg:hidden">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+                <Mail className="w-5 h-5 text-white" />
+              </div>
+              <span className={cn("text-xl font-medium tracking-tight", theme === 'dark' ? 'text-gray-200' : 'text-gray-600')}>BMI Mail</span>
             </div>
-            <span className={cn("text-xl font-medium tracking-tight", theme === 'dark' ? 'text-gray-200' : 'text-gray-600')}>BMI Mail</span>
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800 text-yellow-400' : 'hover:bg-gray-100 text-gray-600')}
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
           </div>
 
           <button 
