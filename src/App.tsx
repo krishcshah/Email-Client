@@ -889,6 +889,14 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
           theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white',
           isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"
         )}>
+          {/* Mobile Logo */}
+          <div className="flex items-center gap-2 px-4 py-2 mb-2 lg:hidden">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+              <Mail className="w-5 h-5 text-white" />
+            </div>
+            <span className={cn("text-xl font-medium tracking-tight", theme === 'dark' ? 'text-gray-200' : 'text-gray-600')}>BMI Mail</span>
+          </div>
+
           <button 
             onClick={() => {
               setReplyData(null);
