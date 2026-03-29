@@ -1038,6 +1038,18 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                   </span>
                   <button 
                     onClick={() => {
+                      if (window.confirm("Are you sure you want to delete this email?")) {
+                        handleMark(selectedEmail, 'delete');
+                        setSelectedEmail(null);
+                      }
+                    }}
+                    className={cn("p-2 rounded-full mr-2", theme === 'dark' ? 'hover:bg-gray-800 text-red-400 hover:text-red-300' : 'hover:bg-gray-100 text-red-500 hover:text-red-600')}
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => {
                       const prev = filteredEmails[currentIndex - 1];
                       setSelectedEmail(prev);
                       if (!prev.read) handleMark(prev, 'read');
@@ -1095,17 +1107,9 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                     >
                       Reply
                     </button>
-                    <button 
-                      onClick={() => {
-                        handleMark(selectedEmail, 'delete');
-                        setSelectedEmail(null);
-                      }}
-                      className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')}
-                      title="Delete"
-                    >
-                      <Trash2 className={cn("w-5 h-5", theme === 'dark' ? 'text-gray-400' : 'text-gray-600')} />
-                    </button>
                     <div className="relative">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setOpenMoveMenuId(openMoveMenuId === selectedEmail.id ? null : selectedEmail.id); }}
                       <button 
                         onClick={(e) => { e.stopPropagation(); setOpenMoveMenuId(openMoveMenuId === selectedEmail.id ? null : selectedEmail.id); }}
                         className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} 
