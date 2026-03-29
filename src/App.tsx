@@ -885,9 +885,9 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         )}
 
         {/* Sidebar */}
-        <aside className={cn("absolute lg:relative z-40 h-full w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-transform duration-200", 
+        <aside className={cn("fixed inset-y-0 left-0 lg:relative z-40 w-64 p-3 flex flex-col gap-1 border-r shrink-0 transition-transform duration-200 lg:translate-x-0 h-full", 
           theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white',
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}>
           {/* Mobile Logo */}
           <div className="flex items-center justify-between px-4 py-2 mb-2 lg:hidden">
@@ -981,7 +981,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
             )}
           </div>
 
-          <div className="mt-auto pt-4 px-4">
+          <div className="mt-auto pt-4 px-4 hidden lg:block">
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className={cn(
