@@ -1110,8 +1110,6 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
                     <div className="relative">
                       <button 
                         onClick={(e) => { e.stopPropagation(); setOpenMoveMenuId(openMoveMenuId === selectedEmail.id ? null : selectedEmail.id); }}
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setOpenMoveMenuId(openMoveMenuId === selectedEmail.id ? null : selectedEmail.id); }}
                         className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} 
                         title="Move to folder"
                       >
