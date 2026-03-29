@@ -938,7 +938,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
 
         {/* Sidebar */}
         <aside className={cn(
-          "fixed inset-y-0 left-0 z-40 p-3 flex flex-col gap-1 border-r shrink-0 transition-all duration-300 h-full", 
+          "fixed inset-y-0 left-0 lg:static z-40 p-3 flex flex-col gap-1 border-r shrink-0 transition-all duration-300 h-full", 
           theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-100 bg-white',
           isSidebarOpen ? "translate-x-0 w-64 shadow-2xl lg:shadow-none" : "-translate-x-full w-64 lg:translate-x-0 lg:w-[72px]"
         )}>
