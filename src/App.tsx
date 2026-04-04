@@ -612,14 +612,17 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         const data = await res.json();
         // Save to Firestore using writeBatch
         const batch = writeBatch(db);
+        const oldDocsMap = new Map();
 
-        // Clean up old buggy numeric IDs
+        // Clean up old buggy numeric IDs and grab current state
         try {
           const oldDocsQuery = query(collection(db, `users/${user.uid}/emails`), where('folder', '==', folder));
           const oldDocsSnap = await getDocs(oldDocsQuery);
           oldDocsSnap.forEach(docSnap => {
             if (/^\d+$/.test(docSnap.id)) {
               batch.delete(docSnap.ref);
+            } else {
+              oldDocsMap.set(docSnap.id, docSnap.data());
             }
           });
         } catch (e) {
@@ -628,6 +631,22 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
 
         for (const email of data.emails) {
           const emailData = { ...email, userId: user.uid };
+          
+          // Preserve local state if present, avoiding race conditions
+          // with optimistic UI updates before the sync fetch resolves
+          const existing = oldDocsMap.get(email.id);
+          const pending = (window as any).pendingMarks || new Set();
+
+          if (existing) {
+            if (pending.has(`read_${email.id}`) || pending.has(`unread_${email.id}`)) {
+              emailData.read = existing.read;
+            }
+            if (pending.has(`star_${email.id}`) || pending.has(`unstar_${email.id}`)) {
+              emailData.starred = existing.starred;
+            }
+            if (existing.localDeleted) emailData.localDeleted = true;
+          }
+
           const emailRef = doc(db, `users/${user.uid}/emails`, email.id);
           batch.set(emailRef, emailData, { merge: true });
         }
@@ -646,6 +665,10 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   const handleMark = async (email: Email, action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'restore') => {
     if (!user || !activeAccount) return;
     
+    // Track pending marks to prevent race condition with incoming sync overwriting optimistic UI
+    (window as any).pendingMarks = (window as any).pendingMarks || new Set();
+    (window as any).pendingMarks.add(`${action}_${email.id}`);
+
     // Optimistic update
     const emailRef = doc(db, `users/${user.uid}/emails`, email.id);
     let updates: any = {};
@@ -678,7 +701,11 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         });
       } catch (err) {
         console.error('Failed to mark on server', err);
+      } finally {
+        (window as any).pendingMarks?.delete(`${action}_${email.id}`);
       }
+    } else {
+      (window as any).pendingMarks?.delete(`${action}_${email.id}`);
     }
   };
 
