@@ -595,8 +595,10 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
   }, [user]);
 
   // Sync emails from IMAP
+  const syncCount = React.useRef(0);
   const syncEmails = async (folder = 'INBOX') => {
     if (!activeAccount || !user) return;
+    syncCount.current += 1;
     setSyncing(true);
     try {
       const res = await fetch('/api/sync', {
@@ -658,8 +660,18 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
       }
       console.error('Sync failed', err);
     } finally {
-      setSyncing(false);
+      syncCount.current -= 1;
+      if (syncCount.current <= 0) {
+        syncCount.current = 0;
+        setSyncing(false);
+      }
     }
+  };
+
+  const refreshAllFolders = () => {
+    if (!activeAccount || !user) return;
+    const foldersToSync = Array.from(new Set(['INBOX', 'Updates', 'Sent', 'Drafts', 'Trash', ...customFolders]));
+    foldersToSync.forEach(folder => syncEmails(folder));
   };
 
   const handleMark = async (email: Email, action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'restore') => {
@@ -831,7 +843,10 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
 
   const allFolders = [
     ...folders,
-    ...customFolders.map(f => ({ id: f, name: f, icon: Folder }))
+    ...customFolders.map(f => {
+      const count = emails.filter(e => e.folder === f && !e.read && !e.localDeleted).length;
+      return { id: f, name: f, icon: Folder, count };
+    })
   ];
 
   const filteredEmails = emails.filter(e => {
@@ -1111,7 +1126,7 @@ function MainApp({ onLogout, key }: { onLogout: () => void, key?: string }) {
         <main className={cn("flex-1 flex flex-col overflow-hidden transition-colors duration-200 min-w-0", theme === 'dark' ? 'bg-gray-900' : 'bg-white')}>
           <div className={cn("h-12 border-b flex items-center px-4 justify-between shrink-0 transition-colors duration-200", theme === 'dark' ? 'border-gray-800' : 'border-gray-100')}>
             <div className="flex items-center gap-2">
-              <button onClick={() => syncEmails(selectedFolder)} className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} disabled={syncing}>
+              <button onClick={refreshAllFolders} className={cn("p-2 rounded-full", theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100')} disabled={syncing}>
                 <RefreshCw className={cn("w-4 h-4", theme === 'dark' ? 'text-gray-400' : 'text-gray-600', syncing && "animate-spin")} />
               </button>
             </div>
